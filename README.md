@@ -56,19 +56,19 @@ index_pages:
 ## WHAT DOES IT DO?
 
 ### Build lints (`hugolint build`)
-[x] Check that all relative links lead somewhere (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
-[x] Run an HTML tidy/validator pass to catch escaping errors and malformed markup
-[x] Detect custom shortcode-like fragments
+- Check that all relative links lead somewhere (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
+- Run an HTML tidy/validator pass to catch escaping errors and malformed markup
+- Detect custom shortcode-like fragments
   - {{<
   -	\>}}
   - {{%
   - %}}
-[x] Unparsed Markdown link/image delimiters leaking as literal text
+- Unparsed Markdown link/image delimiters leaking as literal text
   - (http
   - )http
   - [http
   - ]http
-[x] HTML/comment markers that should be stripped or transformed
+- HTML/comment markers that should be stripped or transformed
   - `<!--`
   - -->
   - <--
@@ -80,15 +80,15 @@ index_pages:
   - `</q<`
 
 ### Markdown lints (`hugolint md`)
-[x] Spelling linting with hunspell or aspell with an dict.txt
-[x] Frontmatter validity
-[x] Balance linting to match parens and quotes
-[x] Don't allow relative links
-[x] Check for malformed URLs
-[x] Code fences missing a language tag
-[x] Image alt text missing ![](url) but ![ ](url), ![image](url), ![img](url) 
-[x] Word repitition like "the the"
-[x] Doubled / malformed punctuation & dashes
+- Spelling linting with hunspell or aspell with an dict.txt
+- Frontmatter validity
+- Balance linting to match parens and quotes
+- Don't allow relative links
+- Check for malformed URLs
+- Code fences missing a language tag
+- Image alt text missing ![](url) but ![ ](url), ![image](url), ![img](url) 
+- Word repitition like "the the"
+- Doubled / malformed punctuation & dashes
   - —— (double em dash)
   - ——– (em dash + en dash)
   - ————– (quadruple em + en)
@@ -96,7 +96,7 @@ index_pages:
   - '' (double apostrophe)
   -   `` (double backtick)
   - ——– variants generally
-[x] Suspicious spacing
+- Suspicious spacing
   -  ) — space before closing paren
   - " — floating/orphaned quote
   - : — spaced colon
