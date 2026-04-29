@@ -107,8 +107,10 @@ the text, then run the same URL-validation function on each match.-->
 - Discourage underscore based formatting
 - Discourage setext headings and trailing hash headings
 - Lack of space after # on a new line
+- HOoizontal rule either less or more than 3 characters ( ---, ***, ___)
 - Inconsistent indent in nested list (2 vs 3 vs 4 spaces)
 - Triple-star `***word*` — ambiguous, often not what the author wanted.
+-  \* \_ \# \[ \]
 - Emphasis adjacent to alphanumerics: `foo**bar**baz` doesn't render as
   emphasis in CommonMark (flanking rules); a frequent surprise.
 - URLs
@@ -124,7 +126,7 @@ the text, then run the same URL-validation function on each match.-->
   - Catch protocol-relative URLs (//example.com) where you meant https://
   - URLs with whitespace, smart quotes, or trailing punctuation accidentally included
 - Warn on lack of space list markers, and > on new lines
-- Balancing parens, quotes, formatting (** \`) and shortcode stuff ({{<)
+- Balancing parens, quotes, formatting (** \`~~) and shortcode stuff ({{<)
 - `{{<shortcode>}}` without the required spaces
 - Spaces inside emphasis markers
 
