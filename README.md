@@ -86,7 +86,7 @@ index_pages:
 - Don't allow relative links
 - Check for malformed URLs
 - Code fences missing a language tag
-- Image alt text missing ![](url) but ![ ](url), ![image](url), ![img](url) 
+- Image alt text missing in `![](url)`, `![ ](url)`, `![image](url)`, `![img](url) `
 - Word repitition like "the the"
 - Doubled / malformed punctuation & dashes
   - —— (double em dash)
