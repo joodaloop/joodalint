@@ -49,6 +49,36 @@ func TestCodeFenceLang_IndentedFence(t *testing.T) {
 	}
 }
 
+func TestCodeFenceLang_Unclosed(t *testing.T) {
+	src := "intro\n```go\ncode\nmore code\n"
+	diags := markdownCodeFenceLang{}.Check(mdFile(src), nil)
+	if len(diags) != 1 || diags[0].Rule != "code-fence-unclosed" || diags[0].Line != 2 {
+		t.Fatalf("want one code-fence-unclosed diag on line 2, got %+v", diags)
+	}
+}
+
+func TestCodeFenceLang_UnclosedNoLang(t *testing.T) {
+	// Both missing-lang and unclosed should fire.
+	src := "```\ncode\n"
+	diags := markdownCodeFenceLang{}.Check(mdFile(src), nil)
+	if len(diags) != 2 {
+		t.Fatalf("want two diags, got %+v", diags)
+	}
+	rules := map[string]int{}
+	for _, d := range diags {
+		rules[d.Rule]++
+	}
+	if rules["code-fence-lang"] != 1 || rules["code-fence-unclosed"] != 1 {
+		t.Fatalf("want one of each rule, got %+v", rules)
+	}
+}
+
+func TestCodeFenceLang_ClosedNotFlagged(t *testing.T) {
+	src := "```go\ncode\n```\n"
+	diags := markdownCodeFenceLang{}.Check(mdFile(src), nil)
+	assertNoDiags(t, diags)
+}
+
 func TestCodeFenceLang_ID(t *testing.T) {
 	if (markdownCodeFenceLang{}).ID() != "code-fence-lang" {
 		t.Fatal("wrong ID")

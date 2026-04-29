@@ -17,15 +17,22 @@ type markdownProseHygiene struct{}
 func (markdownProseHygiene) ID() string { return "prose-hygiene" }
 
 var (
-	wordSplit   = regexp.MustCompile(`[A-Za-z]+`)
-	mdLinkURL   = regexp.MustCompile(`\]\([^)]*\)`)
-	bareURL     = regexp.MustCompile(`https?://\S+`)
-	htmlTag     = regexp.MustCompile(`<[^>]+>`)
-	inlineCode  = regexp.MustCompile("`[^`]*`")
-	spacedColon = regexp.MustCompile(` : `)
-	plusMinus   = regexp.MustCompile(` \+-|\s-\+`)
-	hrLine      = regexp.MustCompile(`^\s*-{3,}\s*$`)
-	fenceLine   = regexp.MustCompile("^\\s*(```|~~~)")
+	wordSplit      = regexp.MustCompile(`[A-Za-z]+`)
+	mdLinkURL      = regexp.MustCompile(`\]\([^)]*\)`)
+	bareURL        = regexp.MustCompile(`https?://\S+`)
+	htmlTag        = regexp.MustCompile(`<[^>]+>`)
+	inlineCode     = regexp.MustCompile("`[^`]*`")
+	spacedColon    = regexp.MustCompile(` : `)
+	plusMinus      = regexp.MustCompile(` \+-|\s-\+`)
+	hrLine         = regexp.MustCompile(`^\s*-{3,}\s*$`)
+	fenceLine      = regexp.MustCompile("^\\s*(```|~~~)")
+	underscoreEmph = regexp.MustCompile(`\s_{1,2}[^\s_][^_\n]*?_{1,2}(\s|[.,;:!?)\]]|$)`)
+	reversedLink   = regexp.MustCompile(`\([^)\n]*\)\[[^\]\n]*\]`)
+	bulletNoSpace  = regexp.MustCompile(`^ {0,3}[-+*][A-Za-z0-9]`)
+	emphasisLine   = regexp.MustCompile(`^ {0,3}\*[^*\s][^*]*\*`)
+	blockquoteNoSp = regexp.MustCompile(`^ {0,3}>[^\s>]`)
+	spacedEmph     = regexp.MustCompile(`\*+\s+\S[^*\n]*\S\s+\*+`)
+	listItemLine   = regexp.MustCompile(`^ {0,3}[-+*]\s`)
 )
 
 type literalPattern struct {
@@ -159,6 +166,36 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "malformed plus-minus (use ±)",
+			})
+		}
+		if reversedLink.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "reversed link syntax (use [text](url))",
+			})
+		}
+		if bulletNoSpace.MatchString(text) && !emphasisLine.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "list bullet without space after marker",
+			})
+		}
+		if blockquoteNoSp.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "blockquote > without space after",
+			})
+		}
+		if !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "spaces inside emphasis markers (* text *)",
+			})
+		}
+		if underscoreEmph.MatchString(" " + prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "underscore emphasis (use * instead)",
 			})
 		}
 	}

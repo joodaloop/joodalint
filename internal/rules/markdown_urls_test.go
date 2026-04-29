@@ -32,6 +32,13 @@ func TestURLs_GoodURLNoDiag(t *testing.T) {
 	assertNoDiags(t, diags)
 }
 
+func TestURLs_HTTPWarns(t *testing.T) {
+	diags := markdownURLs{}.Check(mdFile("see http://example.com/foo here\n"), nil)
+	if !containsMsg(diags, "http:// URL") {
+		t.Fatalf("want http warning, got %v", messages(diags))
+	}
+}
+
 func TestURLs_TrailingPunctTrimmed(t *testing.T) {
 	// Trailing comma should be stripped before validation, so this is fine.
 	diags := markdownURLs{}.Check(mdFile("see https://example.com/foo, then\n"), nil)
@@ -52,6 +59,18 @@ func TestURLs_SiteLocalIgnoresExternalHost(t *testing.T) {
 	ctx := &MarkdownContext{Config: cfg}
 	diags := markdownURLs{}.Check(mdFile("see https://other.com/foo here\n"), ctx)
 	assertNoDiags(t, diags)
+}
+
+func TestURLs_HTTPAndSiteLocalBothReport(t *testing.T) {
+	cfg := &config.Config{Links: config.Links{SiteHosts: []string{"example.com"}}}
+	ctx := &MarkdownContext{Config: cfg}
+	diags := markdownURLs{}.Check(mdFile("see http://example.com/foo here\n"), ctx)
+	if !containsMsg(diags, "http:// URL") {
+		t.Fatalf("want http warning, got %v", messages(diags))
+	}
+	if !containsMsg(diags, "site-local absolute URL") {
+		t.Fatalf("want site-local diag, got %v", messages(diags))
+	}
 }
 
 func TestURLs_ID(t *testing.T) {

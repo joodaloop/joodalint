@@ -30,18 +30,11 @@ func TestProseHygiene_LiteralPatterns(t *testing.T) {
 		{"foo --- bar\n", "literal triple hyphen"},
 		{"it's '' a thing\n", "double apostrophe"},
 		{"`` two\n", "double backtick"},
-		{"text (www.example.com)\n", "missing space/scheme before www"},
-		{"text )www.example.com\n", "missing space after closing paren"},
 		{"hi (there )\n", "space before closing paren"},
 		{"empty []()\n", "empty link"},
+		{"oops ()[]\n", "reversed link syntax"},
 		{"empty ![]()\n", "empty image"},
 		{"link [foo](//x.com)\n", "protocol-relative link"},
-		{"link [foo](/wiki/bar)\n", "wrong wiki path"},
-		{"link [foo](wiki/bar)\n", "wrong wiki path"},
-		{"img [foo](image/x.png)\n", "wrong image path"},
-		{"img [foo](images/x.png)\n", "wrong image path"},
-		{"img [foo](/image/x.png)\n", "wrong image path"},
-		{"img [foo](/images/x.png)\n", "wrong image path"},
 		{` " ](url)` + "\n", "quote glued to link"},
 	}
 	for _, tc := range cases {
@@ -101,21 +94,6 @@ func TestProseHygiene_PlusMinus(t *testing.T) {
 	}
 }
 
-func TestProseHygiene_StrayAfterQuoteParen(t *testing.T) {
-	cases := []string{
-		`hello (foo "), more` + "\n",
-		`hello (foo "); more` + "\n",
-		`hello (foo "),` + "\n",
-		`hello (foo ")` + "\n",
-	}
-	for _, in := range cases {
-		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
-		if !containsMsg(diags, "closing paren attached to stray quote/punct") {
-			t.Errorf("input %q: missing stray-after-quote diag, got %v", in, messages(diags))
-		}
-	}
-}
-
 func TestProseHygiene_LineNumbersAccurate(t *testing.T) {
 	src := "line one\nthe the line two\nline three\nfoo foo line four\n"
 	diags := markdownProseHygiene{}.Check(mdFile(src), nil)
@@ -123,6 +101,164 @@ func TestProseHygiene_LineNumbersAccurate(t *testing.T) {
 	want := []int{2, 4}
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("want lines %v, got %v (msgs %v)", want, got, messages(diags))
+	}
+}
+
+func TestProseHygiene_ReversedLinkFlagged(t *testing.T) {
+	cases := []string{
+		"see (text)[https://example.com] here\n",
+		"(foo)[bar]\n",
+		"oops ()[]\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "reversed link syntax") {
+			t.Errorf("input %q: expected reversed-link diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_ReversedLinkIgnoresValid(t *testing.T) {
+	cases := []string{
+		"normal [text](url) link\n",
+		"two adjacent (paren) [bracket] groups with space\n",
+		"citation (see [1]) reference\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "reversed link syntax") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_UnderscoreEmphasisFlagged(t *testing.T) {
+	cases := []string{
+		"this is _emphasized_ text\n",
+		"_leading_ word at line start\n",
+		"some __strong__ text\n",
+		"end with emphasis _here_\n",
+		"with punct _foo_, more\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "underscore emphasis") {
+			t.Errorf("input %q: expected underscore-emphasis diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_UnderscoreEmphasisIgnoresNonProse(t *testing.T) {
+	cases := []string{
+		"snake_case_var is fine\n",
+		"a foo_bar_baz identifier\n",
+		"link [x](https://example.com/some_path_here)\n",
+		"inline `snake_case_thing` here\n",
+		"<a href=\"/foo_bar\">x</a>\n",
+		"plain prose with no emphasis\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "underscore emphasis") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_BulletNoSpaceFlagged(t *testing.T) {
+	cases := []string{
+		"-foo\n",
+		"+foo\n",
+		"  -bar\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "list bullet without space") {
+			t.Errorf("input %q: expected bullet diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_BulletNoSpaceIgnoresNonBullet(t *testing.T) {
+	cases := []string{
+		"- foo\n",
+		"* foo\n",
+		"+ foo\n",
+		"---\n",
+		"*emphasis*\n",
+		"plain prose\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "list bullet without space") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_BlockquoteNoSpaceFlagged(t *testing.T) {
+	cases := []string{
+		">quoted\n",
+		"  >indented\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "blockquote > without space") {
+			t.Errorf("input %q: expected blockquote diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_BlockquoteNoSpaceIgnoresValid(t *testing.T) {
+	cases := []string{
+		"> quoted\n",
+		">> nested\n",
+		">\n",
+		"plain prose\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "blockquote > without space") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_SpacedEmphasisFlagged(t *testing.T) {
+	cases := []string{
+		"this * text * here\n",
+		"line ** bold ** end\n",
+		"prefix * a b * suffix\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "spaces inside emphasis markers") {
+			t.Errorf("input %q: expected spaced-emphasis diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestProseHygiene_SpacedEmphasisAfterValidEmphasis(t *testing.T) {
+	diags := markdownProseHygiene{}.Check(mdFile("*foo* and * bad * here\n"), nil)
+	if !containsMsg(diags, "spaces inside emphasis markers") {
+		t.Fatalf("want spaced-emphasis diag despite leading *foo*, got %v", messages(diags))
+	}
+}
+
+func TestProseHygiene_SpacedEmphasisIgnoresValid(t *testing.T) {
+	cases := []string{
+		"this *text* here\n",
+		"strong **bold** here\n",
+		"* * *\n",
+		"* list item with *star*\n",
+		"plain prose, no emphasis\n",
+		"a 2 * 3 = 6 b\n",
+	}
+	for _, in := range cases {
+		diags := markdownProseHygiene{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "spaces inside emphasis markers") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
 	}
 }
 

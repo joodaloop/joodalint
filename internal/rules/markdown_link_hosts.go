@@ -20,7 +20,8 @@ func (markdownLinkHosts) ID() string { return "link-host" }
 var (
 	mdLink      = regexp.MustCompile(`\]\(([^)]+)\)`)
 	hostAllowed = regexp.MustCompile(`^[a-zA-Z0-9.\-]+$`)
-	skipSchemes = map[string]bool{"mailto": true, "tel": true, "javascript": true, "data": true}
+	emailLocal  = regexp.MustCompile(`^[A-Za-z0-9!#$%&'*+/=?^_` + "`" + `{|}~.-]+$`)
+	skipSchemes = map[string]bool{"tel": true, "javascript": true, "data": true}
 )
 
 func (markdownLinkHosts) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
@@ -31,6 +32,16 @@ func (markdownLinkHosts) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic
 	for scanner.Scan() {
 		line++
 		for _, m := range mdLink.FindAllStringSubmatch(scanner.Text(), -1) {
+			inner := strings.TrimSpace(m[1])
+			if strings.HasPrefix(strings.ToLower(inner), "mailto:") {
+				if msg := validateMailto(stripLinkTitle(inner)); msg != "" {
+					diags = append(diags, Diagnostic{
+						Path: f.Path, Line: line, Rule: "link-host",
+						Message: fmt.Sprintf("%s: %s", msg, inner),
+					})
+				}
+				continue
+			}
 			raw := stripTitle(m[1])
 			if raw == "" || raw[0] == '/' || raw[0] == '#' {
 				continue
@@ -63,6 +74,46 @@ func stripTitle(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// stripLinkTitle removes a trailing markdown link title (` "..."` or ` '...'`)
+// without splitting at internal whitespace, so spaces inside the URL itself
+// remain visible to validators.
+func stripLinkTitle(s string) string {
+	for _, sep := range []string{` "`, ` '`, "\t\"", "\t'"} {
+		if i := strings.Index(s, sep); i >= 0 {
+			s = s[:i]
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+func validateMailto(raw string) string {
+	addr := strings.TrimPrefix(raw, "mailto:")
+	if i := strings.IndexAny(addr, "?#"); i >= 0 {
+		addr = addr[:i]
+	}
+	if addr == "" {
+		return "empty mailto address"
+	}
+	at := strings.LastIndex(addr, "@")
+	if at < 0 {
+		return "mailto missing @"
+	}
+	local, domain := addr[:at], addr[at+1:]
+	if local == "" {
+		return "mailto empty local part"
+	}
+	if strings.HasPrefix(local, ".") || strings.HasSuffix(local, ".") || strings.Contains(local, "..") {
+		return "mailto invalid local part"
+	}
+	if !emailLocal.MatchString(local) {
+		return "mailto invalid characters in local part"
+	}
+	if msg := validateHost(domain); msg != "" {
+		return "mailto " + msg
+	}
+	return ""
 }
 
 func validateHost(host string) string {

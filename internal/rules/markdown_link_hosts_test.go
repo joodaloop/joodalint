@@ -36,6 +36,7 @@ func TestLinkHosts_InvalidHosts(t *testing.T) {
 func TestLinkHosts_SkippedSchemes(t *testing.T) {
 	for _, in := range []string{
 		"[a](mailto:foo@bar.com)\n",
+		"[a](mailto:foo+tag@bar.com?subject=hi)\n",
 		"[a](tel:+15551234)\n",
 		"[a](javascript:alert(1))\n",
 		"[a](data:text/plain,hi)\n",
@@ -43,6 +44,29 @@ func TestLinkHosts_SkippedSchemes(t *testing.T) {
 		diags := markdownLinkHosts{}.Check(mdFile(in), nil)
 		if len(diags) != 0 {
 			t.Errorf("input %q should be skipped, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestLinkHosts_InvalidMailto(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"[a](mailto:)\n", "empty mailto address"},
+		{"[a](mailto:foo)\n", "mailto missing @"},
+		{"[a](mailto:@bar.com)\n", "mailto empty local part"},
+		{"[a](mailto:.foo@bar.com)\n", "mailto invalid local part"},
+		{"[a](mailto:foo.@bar.com)\n", "mailto invalid local part"},
+		{"[a](mailto:fo..o@bar.com)\n", "mailto invalid local part"},
+		{"[a](mailto:foo bar@bar.com)\n", "mailto invalid characters in local part"},
+		{"[a](mailto:foo,bar@bar.com)\n", "mailto invalid characters in local part"},
+		{"[a](mailto:foo@bar)\n", "mailto host has no dot"},
+		{"[a](mailto:foo@bad_host.com)\n", "mailto invalid characters in host"},
+	}
+	for _, tc := range cases {
+		diags := markdownLinkHosts{}.Check(mdFile(tc.in), nil)
+		if !containsMsg(diags, tc.want) {
+			t.Errorf("input %q: want %q, got %v", tc.in, tc.want, messages(diags))
 		}
 	}
 }

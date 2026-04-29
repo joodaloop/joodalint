@@ -22,6 +22,7 @@ func (markdownCodeFenceLang) Check(f *MarkdownFile, _ *MarkdownContext) []Diagno
 	inFence := false
 	fenceChar := byte(0)
 	fenceLen := 0
+	fenceLine := 0
 
 	line := 0
 	for scanner.Scan() {
@@ -54,12 +55,19 @@ func (markdownCodeFenceLang) Check(f *MarkdownFile, _ *MarkdownContext) []Diagno
 		inFence = true
 		fenceChar = c
 		fenceLen = n
+		fenceLine = line
 		if rest == "" {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "code-fence-lang",
 				Message: "code fence missing language tag",
 			})
 		}
+	}
+	if inFence {
+		diags = append(diags, Diagnostic{
+			Path: f.Path, Line: fenceLine, Rule: "code-fence-unclosed",
+			Message: "code fence opened but never closed",
+		})
 	}
 	return diags
 }

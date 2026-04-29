@@ -66,6 +66,15 @@ func (markdownURLs) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagnostic {
 					continue
 				}
 
+				if scheme == "http" {
+					diags = append(diags, Diagnostic{
+						Path:    f.Path,
+						Line:    line,
+						Rule:    "http-url",
+						Message: fmt.Sprintf("http:// URL: %s", url),
+					})
+				}
+
 				u, err := urlpkg.Parse(url)
 				if err == nil && siteHosts[u.Host] {
 					diags = append(diags, Diagnostic{
