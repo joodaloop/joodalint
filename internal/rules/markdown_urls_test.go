@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/joodaloop/lint/internal/config"
+	"github.com/joodaloop/hugolint/internal/config"
 )
 
 func TestURLs_SchemeMissingColon(t *testing.T) {

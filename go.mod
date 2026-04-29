@@ -1,4 +1,4 @@
-module github.com/joodaloop/lint
+module github.com/joodaloop/hugolint
 
 go 1.25.0
 

@@ -6,10 +6,10 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/joodaloop/lint/internal/config"
-	"github.com/joodaloop/lint/internal/runner"
+	"github.com/joodaloop/hugolint/internal/config"
+	"github.com/joodaloop/hugolint/internal/runner"
 
-	_ "github.com/joodaloop/lint/internal/rules"
+	_ "github.com/joodaloop/hugolint/internal/rules"
 )
 
 func main() {

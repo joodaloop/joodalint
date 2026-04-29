@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"github.com/joodaloop/lint/internal/config"
+	"github.com/joodaloop/hugolint/internal/config"
 )
 
 func ctxWithSection(section string, schema map[string]config.FieldSpec) *MarkdownContext {

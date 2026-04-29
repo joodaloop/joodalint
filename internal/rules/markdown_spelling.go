@@ -12,7 +12,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/joodaloop/lint/internal/config"
+	"github.com/joodaloop/hugolint/internal/config"
 )
 
 func init() {

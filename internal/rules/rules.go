@@ -1,6 +1,6 @@
 package rules
 
-import "github.com/joodaloop/lint/internal/config"
+import "github.com/joodaloop/hugolint/internal/config"
 
 type Diagnostic struct {
 	Path    string

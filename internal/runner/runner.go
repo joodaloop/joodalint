@@ -13,8 +13,8 @@ import (
 
 	"golang.org/x/net/html"
 
-	"github.com/joodaloop/lint/internal/config"
-	"github.com/joodaloop/lint/internal/rules"
+	"github.com/joodaloop/hugolint/internal/config"
+	"github.com/joodaloop/hugolint/internal/rules"
 )
 
 func Markdown(cfg *config.Config) (int, error) {

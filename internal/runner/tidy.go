@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/joodaloop/lint/internal/rules"
+	"github.com/joodaloop/hugolint/internal/rules"
 )
 
 // tidyDiagnostics shells out to tidy-html5 for every .html file under root.
