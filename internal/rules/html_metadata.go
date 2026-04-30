@@ -24,6 +24,10 @@ func (headMetadata) Check(f *HTMLFile, ctx *HTMLContext) []Diagnostic {
 		add("missing or empty <title>")
 	}
 
+	if strings.TrimSpace(f.Lang) == "" {
+		add(`missing <html lang="...">`)
+	}
+
 	byName := map[string]string{}
 	byProp := map[string]string{}
 	var charset string

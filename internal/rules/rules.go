@@ -93,6 +93,7 @@ type HTMLFile struct {
 	Assets    []Asset
 	IDs       map[string]int
 	Title     string
+	Lang      string
 	Metas     []MetaTag
 	HeadLinks []HeadLink
 	// Text is the concatenated text content of the document, excluding

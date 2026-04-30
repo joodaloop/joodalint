@@ -13,6 +13,7 @@ func goodMetaFile() *HTMLFile {
 		Path:    "/site/public/index.html",
 		URLPath: "/index.html",
 		Title:   "Pager",
+		Lang:    "en",
 		Metas: []MetaTag{
 			{Charset: "utf-8"},
 			{HTTPEquiv: "Content-Type", Content: "text/html; charset=UTF-8"},
@@ -37,10 +38,10 @@ func metaCtx() *HTMLContext {
 	return &HTMLContext{
 		Root: "/site/public",
 		Pages: map[string]bool{
-			"/":                 true,
-			"/index.html":       true,
-			"/index.md":         true,
-			"/assets/card.jpg":  true,
+			"/":                true,
+			"/index.html":      true,
+			"/index.md":        true,
+			"/assets/card.jpg": true,
 		},
 		Config: &config.Config{Links: config.Links{SiteHosts: []string{"pager.joodaloop.com"}}},
 	}
@@ -278,5 +279,16 @@ func TestHeadMetadata_NoSiteHostsSkipsHostCheck(t *testing.T) {
 func TestHeadMetadata_ID(t *testing.T) {
 	if (headMetadata{}).ID() != "head-metadata" {
 		t.Fatal("wrong ID")
+	}
+}
+
+func TestHeadMetadata_MissingOrEmptyLang(t *testing.T) {
+	for _, lang := range []string{"", "   "} {
+		f := goodMetaFile()
+		f.Lang = lang
+		diags := headMetadata{}.Check(f, metaCtx())
+		if !containsMsg(diags, `missing <html lang`) {
+			t.Fatalf("want missing-lang diag for lang=%q, got %v", lang, messages(diags))
+		}
 	}
 }

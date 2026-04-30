@@ -152,7 +152,7 @@ func loadHTML(root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]boo
 		if err != nil {
 			return err
 		}
-		links, images, assets, ids, text, title, metas, headLinks := parseHTML(b)
+		links, images, assets, ids, text, title, lang, metas, headLinks := parseHTML(b)
 		files = append(files, &rules.HTMLFile{
 			Path:      p,
 			URLPath:   urlPathFor(root, p),
@@ -162,6 +162,7 @@ func loadHTML(root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]boo
 			IDs:       ids,
 			Text:      text,
 			Title:     title,
+			Lang:      lang,
 			Metas:     metas,
 			HeadLinks: headLinks,
 		})
@@ -174,7 +175,7 @@ func loadHTML(root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]boo
 	return files, allFiles, pages, pageIDs, err
 }
 
-func parseHTML(content []byte) (links, images []string, assets []rules.Asset, ids map[string]int, text, title string, metas []rules.MetaTag, headLinks []rules.HeadLink) {
+func parseHTML(content []byte) (links, images []string, assets []rules.Asset, ids map[string]int, text, title, lang string, metas []rules.MetaTag, headLinks []rules.HeadLink) {
 	ids = map[string]int{}
 	var textBuf, titleBuf bytes.Buffer
 	skipDepth := 0 // depth inside <script>/<style>/<pre>/<code>
@@ -239,7 +240,7 @@ func parseHTML(content []byte) (links, images []string, assets []rules.Asset, id
 		if tt == html.StartTagToken && tag == "title" {
 			titleDepth++
 		}
-		var href, src, id, metaName, metaProp, metaEquiv, metaCharset, metaContent, linkRel, linkType, linkTitle string
+		var href, src, id, metaName, metaProp, metaEquiv, metaCharset, metaContent, linkRel, linkType, linkTitle, htmlLang string
 		if hasAttr {
 			for {
 				k, v, more := z.TagAttr()
@@ -266,6 +267,8 @@ func parseHTML(content []byte) (links, images []string, assets []rules.Asset, id
 					linkType = string(v)
 				case "title":
 					linkTitle = string(v)
+				case "lang":
+					htmlLang = string(v)
 				}
 				if !more {
 					break
@@ -306,6 +309,9 @@ func parseHTML(content []byte) (links, images []string, assets []rules.Asset, id
 			if src != "" {
 				assets = append(assets, rules.Asset{Tag: tag, Attr: "src", URL: src})
 			}
+		}
+		if tag == "html" {
+			lang = strings.TrimSpace(htmlLang)
 		}
 		if id != "" {
 			ids[id]++
