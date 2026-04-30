@@ -31,9 +31,7 @@ func TestProseHygiene_LiteralPatterns(t *testing.T) {
 		{"it's '' a thing\n", "double apostrophe"},
 		{"`` two\n", "double backtick"},
 		{"hi (there )\n", "space before closing paren"},
-		{"empty []()\n", "empty link"},
 		{"oops ()[]\n", "reversed link syntax"},
-		{"empty ![]()\n", "empty image"},
 		{"link [foo](//x.com)\n", "protocol-relative link"},
 		{` " ](url)` + "\n", "quote glued to link"},
 	}

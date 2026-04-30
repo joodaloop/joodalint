@@ -184,6 +184,187 @@ func TestURLs_FragmentOK(t *testing.T) {
 	assertNoDiags(t, markdownURLs{}.Check(mdFile("[foo](#anchor)\n"), nil))
 }
 
+// --- emptiness ------------------------------------------------------------
+
+func TestURLs_EmptyLinkURL(t *testing.T) {
+	for _, in := range []string{
+		"see [text]() here\n",
+		"see [text]( ) here\n", // goldmark normalizes whitespace-only dest to ""
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "empty link URL") {
+			t.Errorf("input %q: want empty link URL diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestURLs_EmptyImageURL(t *testing.T) {
+	for _, in := range []string{
+		"see ![alt]() here\n",
+		"see ![alt]( ) here\n",
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "empty image URL") {
+			t.Errorf("input %q: want empty image URL diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestURLs_EmptyLinkText(t *testing.T) {
+	for _, in := range []string{
+		"see [](https://example.com) here\n",
+		"see [ ](https://example.com) here\n",
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "empty link text") {
+			t.Errorf("input %q: want empty link text diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestURLs_EmptyImageAlt(t *testing.T) {
+	for _, in := range []string{
+		"see ![](/foo.png) here\n",
+		"see ![ ](/foo.png) here\n",
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		if !containsMsg(diags, "empty image alt") {
+			t.Errorf("input %q: want empty image alt diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestURLs_BothEmpty(t *testing.T) {
+	// `[]()` should produce both empty-url and empty-link-text.
+	diags := markdownURLs{}.Check(mdFile("[]()\n"), nil)
+	if !containsMsg(diags, "empty link URL") {
+		t.Errorf("want empty link URL diag, got %v", messages(diags))
+	}
+	if !containsMsg(diags, "empty link text") {
+		t.Errorf("want empty link text diag, got %v", messages(diags))
+	}
+}
+
+func TestURLs_NonEmptyTextAndURLOK(t *testing.T) {
+	for _, in := range []string{
+		"[text](https://example.com)\n",
+		"![real alt](/x.png)\n",
+		"<https://example.com>\n",
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		for _, d := range diags {
+			if d.Rule == "empty-url" || d.Rule == "empty-link-text" || d.Rule == "empty-image-alt" {
+				t.Errorf("input %q: unexpected emptiness diag %q", in, d.Message)
+			}
+		}
+	}
+}
+
+// --- url-chars whitelist --------------------------------------------------
+
+func TestURLs_UnsafeCharsFlagged(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"[a](https://x.com/“hi”)\n", "unencoded characters"},   // smart quotes
+		{"[a](https://x.com/\"foo)\n", "unencoded characters"},  // straight dquote
+		{"[a](https://x.com/foo|bar)\n", "unencoded characters"}, // pipe
+		{"[a](https://x.com/foo^bar)\n", "unencoded characters"}, // caret
+		{"[a](https://x.com/foo`bar)\n", "unencoded characters"}, // backtick
+		{"[a](https://x.com/foo{x})\n", "unencoded characters"},  // braces
+		{"[a](https://x.com/foo\\bar)\n", "unencoded characters"}, // backslash
+		{"[a](https://x.com/<foo)\n", "unencoded characters"},    // less-than
+		{"[a](https://x.com/café)\n", "unencoded characters"},    // raw unicode
+		{"[a](<https://x.com/foo bar>)\n", "unencoded characters"}, // angle-bracket form lets a space through
+	}
+	for _, tc := range cases {
+		diags := markdownURLs{}.Check(mdFile(tc.in), nil)
+		if !containsMsg(diags, tc.want) {
+			t.Errorf("input %q: want url-chars diag, got %v", tc.in, messages(diags))
+		}
+	}
+}
+
+func TestURLs_SafeCharsOK(t *testing.T) {
+	for _, in := range []string{
+		"[a](https://x.com/foo/bar)\n",
+		"[a](https://x.com/foo?q=1&r=2#frag)\n",
+		"[a](https://x.com/path-with_chars.ext~v2)\n",
+		"[a](https://x.com/already%20encoded)\n",
+		"[a](https://x.com/(parens))\n",
+		"[a](https://x.com/path/with(balanced)parens)\n",
+	} {
+		diags := markdownURLs{}.Check(mdFile(in), nil)
+		if containsMsg(diags, "unencoded characters") {
+			t.Errorf("input %q: should not flag, got %v", in, messages(diags))
+		}
+	}
+}
+
+// --- image-alt (merged from markdown_image_alt.go) ------------------------
+
+func TestImageAlt_GenericAlts(t *testing.T) {
+	cases := []string{
+		"![image](/foo.png)\n",
+		"![img](/foo.png)\n",
+		"![picture](/foo.png)\n",
+		"![pic](/foo.png)\n",
+		"![photo](/foo.png)\n",
+		"![screenshot](/foo.png)\n",
+		"![figure](/foo.png)\n",
+		"![alt](/foo.png)\n",
+		"![alt text](/foo.png)\n",
+		"![ Image ](/foo.png)\n",
+	}
+	for _, in := range cases {
+		diags := markdownImageAlt{}.Check(mdFile(in), nil)
+		if len(diags) == 0 {
+			t.Errorf("input %q: expected diag", in)
+		}
+	}
+}
+
+// Empty/whitespace alts are owned by the empty-image-alt rule (markdownURLs);
+// the image-alt rule no longer flags them.
+func TestImageAlt_EmptyNotFlagged(t *testing.T) {
+	for _, in := range []string{
+		"![](/foo.png)\n",
+		"![ ](/foo.png)\n",
+	} {
+		diags := markdownImageAlt{}.Check(mdFile(in), nil)
+		if len(diags) != 0 {
+			t.Errorf("input %q: expected no image-alt diag, got %v", in, messages(diags))
+		}
+	}
+}
+
+func TestImageAlt_DescriptiveAltOK(t *testing.T) {
+	diags := markdownImageAlt{}.Check(mdFile("![A black cat sleeping](/cat.png)\n"), nil)
+	assertNoDiags(t, diags)
+}
+
+func TestImageAlt_MultiplePerLine(t *testing.T) {
+	src := "![pic](/a.png) and ![real text](/b.png) and ![image](/c.png)\n"
+	diags := markdownImageAlt{}.Check(mdFile(src), nil)
+	if len(diags) != 2 {
+		t.Fatalf("want 2 diags, got %d: %v", len(diags), messages(diags))
+	}
+}
+
+func TestImageAlt_LineNumber(t *testing.T) {
+	src := "para\n\n![image](/x.png)\n"
+	diags := markdownImageAlt{}.Check(mdFile(src), nil)
+	if len(diags) != 1 || diags[0].Line != 3 {
+		t.Fatalf("want line 3, got %+v", diags)
+	}
+}
+
+func TestImageAlt_ID(t *testing.T) {
+	if (markdownImageAlt{}).ID() != "image-alt" {
+		t.Fatal("wrong ID")
+	}
+}
+
 // --- ID -------------------------------------------------------------------
 
 func TestURLs_ID(t *testing.T) {

@@ -46,8 +46,6 @@ var literalPatterns = []literalPattern{
 	{"''", "double apostrophe"},
 	{"``", "double backtick"},
 	{" )", "space before closing paren"},
-	{"]()", "empty link"},
-	{"![](", "empty image"},
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
 }

@@ -11,11 +11,54 @@ import (
 
 func init() {
 	RegisterMarkdownAST(&markdownURLs{})
+	RegisterMarkdownAST(&markdownImageAlt{})
 }
 
 type markdownURLs struct{}
 
 func (markdownURLs) ID() string { return "url" }
+
+type markdownImageAlt struct{}
+
+func (markdownImageAlt) ID() string { return "image-alt" }
+
+// genericAlts are non-empty alt strings that convey no useful information.
+// Empty/whitespace alts are reported by the empty-image-alt diagnostic
+// inside markdownURLs.
+var genericAlts = map[string]bool{
+	"image":      true,
+	"img":        true,
+	"picture":    true,
+	"pic":        true,
+	"photo":      true,
+	"screenshot": true,
+	"figure":     true,
+	"alt":        true,
+	"alt text":   true,
+}
+
+func (markdownImageAlt) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
+	var diags []Diagnostic
+	ast.Walk(f.AST, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		img, ok := n.(*ast.Image)
+		if !ok {
+			return ast.WalkContinue, nil
+		}
+		raw := nodeText(img, f.Body)
+		alt := strings.ToLower(strings.TrimSpace(raw))
+		if genericAlts[alt] {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: f.NodeLine(img), Rule: "image-alt",
+				Message: fmt.Sprintf("useless image alt text: %q", raw),
+			})
+		}
+		return ast.WalkSkipChildren, nil
+	})
+	return diags
+}
 
 var (
 	schemeNoColon   = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.\-]*//`)
@@ -24,6 +67,9 @@ var (
 	emailLocal      = regexp.MustCompile(`^[A-Za-z0-9!#$%&'*+/=?^_` + "`" + `{|}~.-]+$`)
 	knownSchemes    = map[string]bool{"http": true, "https": true}
 	skipSchemes     = map[string]bool{"tel": true, "javascript": true, "data": true}
+	// RFC 3986 set: unreserved + pct-encoded + gen-delims + sub-delims.
+	// Anything outside this must be percent-encoded.
+	urlSafeChar = regexp.MustCompile(`^[A-Za-z0-9\-._~%:/?#\[\]@!$&'()*+,;=]+$`)
 )
 
 func (markdownURLs) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagnostic {
@@ -33,15 +79,44 @@ func (markdownURLs) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagnostic {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		raw, ok := urlForValidation(n, f.Body)
-		if !ok {
+		var raw, kind string
+		switch v := n.(type) {
+		case *ast.Link:
+			raw, kind = string(v.Destination), "link"
+		case *ast.Image:
+			raw, kind = string(v.Destination), "image"
+		case *ast.AutoLink:
+			raw, kind = string(v.URL(f.Body)), "autolink"
+		default:
 			return ast.WalkContinue, nil
 		}
+		line := f.NodeLine(n)
+
+		// Emptiness checks. Autolinks always have a URL and no separate
+		// text node, so skip them here.
+		if kind != "autolink" {
+			if strings.TrimSpace(raw) == "" {
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: line, Rule: "empty-url",
+					Message: fmt.Sprintf("empty %s URL", kind),
+				})
+			}
+			if strings.TrimSpace(nodeText(n, f.Body)) == "" {
+				rule, msg := "empty-link-text", "empty link text"
+				if kind == "image" {
+					rule, msg = "empty-image-alt", "empty image alt"
+				}
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: line, Rule: rule, Message: msg,
+				})
+			}
+		}
+
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			return ast.WalkContinue, nil
 		}
-		diags = append(diags, validateLinkURL(f.Path, f.NodeLine(n), raw, siteHosts)...)
+		diags = append(diags, validateLinkURL(f.Path, line, raw, siteHosts)...)
 		return ast.WalkContinue, nil
 	})
 	return diags
@@ -110,6 +185,13 @@ func validateLinkURL(path string, line int, raw string, siteHosts map[string]boo
 			Message: fmt.Sprintf("http:// URL: %s", raw),
 		})
 	}
+	if bad := unsafeURLChars(raw); len(bad) > 0 {
+		diags = append(diags, Diagnostic{
+			Path: path, Line: line, Rule: "url-chars",
+			Message: fmt.Sprintf("URL contains unencoded characters %s (percent-encode them): %s",
+				quoteRunes(bad), raw),
+		})
+	}
 	if siteHosts[u.Host] {
 		diags = append(diags, Diagnostic{
 			Path: path, Line: line, Rule: "site-local-url",
@@ -125,18 +207,49 @@ func validateLinkURL(path string, line int, raw string, siteHosts map[string]boo
 	return diags
 }
 
-// urlForValidation returns the destination URL for a Link, Image, or
-// AutoLink node. AutoLink emails are returned with their "mailto:" prefix.
-func urlForValidation(n ast.Node, source []byte) (string, bool) {
-	switch v := n.(type) {
-	case *ast.Link:
-		return string(v.Destination), true
-	case *ast.Image:
-		return string(v.Destination), true
-	case *ast.AutoLink:
-		return string(v.URL(source)), true
+// unsafeURLChars returns the unique set of characters in raw that fall
+// outside the RFC 3986 unencoded-safe set (in first-seen order).
+func unsafeURLChars(raw string) []rune {
+	if urlSafeChar.MatchString(raw) {
+		return nil
 	}
-	return "", false
+	var bad []rune
+	seen := map[rune]bool{}
+	for _, r := range raw {
+		if r < 0x80 && urlSafeChar.MatchString(string(r)) {
+			continue
+		}
+		if seen[r] {
+			continue
+		}
+		seen[r] = true
+		bad = append(bad, r)
+	}
+	return bad
+}
+
+func quoteRunes(rs []rune) string {
+	parts := make([]string, len(rs))
+	for i, r := range rs {
+		parts[i] = fmt.Sprintf("%q", string(r))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// nodeText returns the concatenated text content of a node's descendants
+// (used to inspect link text and image alt text).
+func nodeText(n ast.Node, source []byte) string {
+	var b strings.Builder
+	ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if t, ok := c.(*ast.Text); ok {
+			b.Write(t.Segment.Value(source))
+		}
+		return ast.WalkContinue, nil
+	})
+	return b.String()
 }
 
 func validateMailto(raw string) string {

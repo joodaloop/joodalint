@@ -58,85 +58,93 @@ index_pages:
 ### Frontmatter lint for anything that doesn't match the declared schema *in any way*
 
 ### Build lints (`hugolint build`)
-- Checks site build for orphan files (not linked to from anywhere)
-- Check for presense of essential meta tags
-- Check that all internal links point to an existing file (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
-- Run an HTML tidy/validator pass to catch escaping errors and malformed markup
-- Detect custom shortcode-like fragments
-  - {{<
-  -	\>}}
-  - {{%
-  - %}}
-- HTML/comment markers that should be stripped or transformed
-  - `<!--`
-  - -->
-  - <--
-  - <—
-  - —>
-  - `<del>`
-  - `<q>`
-  - `</q>`
-  - `</q<`
+- [ ] Checks site build for orphan files (not linked to from anywhere)
+- [ ] Check for presense of essential meta tags
+- [ ] Check that all internal links point to an existing file (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
+- [ ] Run an HTML tidy/validator pass to catch escaping errors and malformed markup
+- [ ] Detect custom shortcode-like fragments
+    - {{<
+    -	\>}}
+    - {{%
+    - %}}
+- [ ] HTML/comment markers that should be stripped or transformed
+    - `<!--`
+    - -->
+    - <--
+    - <—
+    - —>
+    - `<del>`
+    - `<q>`
+    - `</q>`
+    - `</q<`
 
+### Raw body checks
+- [ ] Discourage Setext headings
+- [ ] Discourage reference links
+- [ ] Catch emphasis flanking *foo*bar* parses as <em>foo</em>bar*
+- [ ] Discourage using smart quotes in content directly
 
 ### With-markdown AST 
-- Warn on H1s (they should be in title: )
-- Warn on any heading more than 4
-- URLs
-  - mailto: addresses that aren’t valid email syntax
-  - Don't allow http:// 
-  - Empty URLs or empty URL text
-  - Don't allow relative links
-  - Smart quotes inside URL
-  - [text](url with space)
-  - URLs with whitespace, smart quotes, or trailing punctuation accidentally included
-  - Image alt text missing in `![](url)`, `![ ](url)`, `![image](url)`, `![img](url) `
-  - ](// — protocol-relative link
+- [x] Warn on H1s (they should be in title: )
+- [x] Warn on any heading more than 4
+- [x] URLs
+  - [x] Catch mailto: addresses that aren’t valid email syntax
+  - [x] Don't allow http:// 
+  - [x] Empty URLs or empty URL text/alt
+  - [x] Don't allow relative links
+  - [x] Catch non-URL-safe characters inside URL
+  - [ ] Don't allow https://mydomain.com
+  - [ ] Discourage protocol-relative link
+  - [ ] Invisible characters
+  - [ ] Dicourage spacing [ text ] and punctuation [documentation.](https://example.com) in URL text 
+  - [ ] Too long link text
+  - [ ] Too long code formatting
 
-### Post-markdown checks
-- Headings must start at the beginning of the line
-- Discourage underscore based formatting
-- Discourage setext headings and trailing hash headings
-- Lack of space after # on a new line
-- Horizontal rule either less or more than 3 characters ( ---, ***, ___)
-- Inconsistent indent in nested list (2 vs 3 vs 4 spaces)
-- Triple-star `***word*` — ambiguous, often not what the author wanted.
--  \* \_ \# \[ \]
-- Emphasis adjacent to alphanumerics: `foo**bar**baz` doesn't render as
-  emphasis in CommonMark (flanking rules); a frequent surprise.
-- URLs
-  - " ]( — quote glued to link
-  - Smart quotes inside URL.
-  - Duplicate trailing slashes, double slashes in paths
-  - [text](non-URL character)
-  - [text] (url)
-  - [text](url "title)
-  - ![alt(image.png)
-  - Reversed link syntax ()[]
-  - Check for malformed URLs
-  - Catch protocol-relative URLs (//example.com) where you meant https://
-  - URLs with whitespace, smart quotes, or trailing punctuation accidentally included
-- Warn on lack of space list markers, and > on new lines
-- Balancing parens, quotes, formatting (** \`~~) and shortcode stuff ({{<)
-- `{{<shortcode>}}` without the required spaces
-- Spaces inside emphasis markers
-- Spellcheck on prose with aspell with an personal dictionary
-- Word repetition like "the the"
-- Unparsed Markdown link/image delimiters leaking as literal text
-  - (http
-  - )http
-  - [http
-  - ]http
-- Doubled / malformed punctuation & dashes
-  - —— (double em dash)
-  - ——– (em dash + en dash)
-  - ————– (quadruple em + en)
-  - --- (literal triple hyphen)
-  - '' (double apostrophe)
-  -   `` (double backtick)
-  - ——– variants generally
-- Suspicious spacing
-  -  ) — space before closing paren
-  - " — floating/orphaned quote
-  - : — spaced colon
-  -  +- /  -+ — malformed plus-minus
+### Post-AST checks
+- [ ] Broken Markdown
+  - [ ] Headings must start at the beginning of the line
+  - [ ] Lack of space after # on a new line
+  - [ ] Horizontal rule failures ( --on new lines)
+  - [ ] Failed list formatting (2 vs 3 vs 4 spaces)
+  - [ ] Triple-star `***word*` — ambiguous, often not what the author wanted.
+  - [ ]  \* \_ \# \[ \]
+  - [ ] Warn on lack of space after > on new lines
+  - [ ] Spaces inside emphasis markers
+  - [ ] Odd number of spaces/tabs
+- [ ] URLs
+  - [ ] Discourage bare URLs in prose
+  - [ ] " ]( — quote glued to link
+  - [ ] (http
+  - [ ] )http
+  - [ ] [http
+  - [ ] ]http
+  - [ ] Duplicate trailing slashes, double slashes in paths
+  - [ ] [Text](https://example.com “Title”)
+  - [ ] [text](non-URL character)
+  - [ ] [text](url with space)
+  - [ ] [text] (url)
+  - [ ] [text](url "title)
+  - [ ] ![alt(image.png)
+  - [ ] Reversed link syntax ()[]
+  - [ ] Check for malformed URLs
+  - [ ] URLs with whitespace, smart quotes, or trailing punctuation accidentally included
+- [ ] Balancing parens, quotes, formatting (** \`~~) and shortcode delimiters ({{<)
+- [ ] `{{<shortcode>}}` without the required spaces
+- [ ] Spellcheck on prose with aspell with an personal dictionary
+- [ ] Word repetition like "the the"
+- [ ] Suffix handling (2nd, 50kg vs 50 kg)
+- [ ] Unparsed Markdown link/image delimiters leaking as literal text
+- [ ] Doubled / malformed punctuation & dashes
+  - [ ] —— (double em dash)
+  - [ ] ——– (em dash + en dash)
+  - [ ] ————– (quadruple em + en)
+  - [ ] --- (literal triple hyphen)
+  - [ ] '' (double apostrophe)
+  - [ ] ,, (double commas)
+  - [ ]   `` (double backtick)
+  - [ ] ——– variants generally
+- [ ] Suspicious spacing
+  - [ ]  ) — space before closing paren
+  - [ ] " — floating/orphaned quote
+  - [ ] : — spaced colon
+  - [ ]  +- /  -+ — malformed plus-minus
