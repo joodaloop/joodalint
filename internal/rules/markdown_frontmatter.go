@@ -105,6 +105,52 @@ func extractFrontmatter(content []byte) ([]byte, int, bool) {
 	return rest[:end], 1, true
 }
 
+// SplitFrontmatter parses leading YAML frontmatter and returns the raw YAML
+// (without fences), the body after the closing fence, the number of lines
+// the frontmatter occupied, and the 1-based line where the frontmatter
+// starts. If there is no frontmatter, fmRaw is nil, body == content,
+// fmLines == 0, fmStartLine == 0.
+func SplitFrontmatter(content []byte) (fmRaw, body []byte, fmLines, fmStartLine int) {
+	var prefix int
+	switch {
+	case bytes.HasPrefix(content, []byte("---\n")):
+		prefix = 4
+	case bytes.HasPrefix(content, []byte("---\r\n")):
+		prefix = 5
+	default:
+		return nil, content, 0, 0
+	}
+	rest := content[prefix:]
+	end := bytes.Index(rest, []byte("\n---"))
+	if end < 0 {
+		return nil, content, 0, 0
+	}
+	fmRaw = rest[:end]
+	after := rest[end+len("\n---"):]
+	if i := bytes.IndexByte(after, '\n'); i >= 0 {
+		body = after[i+1:]
+	} else {
+		body = nil
+	}
+	consumed := len(content) - len(body)
+	fmLines = bytes.Count(content[:consumed], []byte("\n"))
+	fmStartLine = 1
+	return
+}
+
+// ParseFrontmatterYAML unmarshals raw frontmatter YAML into a map. Returns
+// nil if the YAML is empty or fails to parse.
+func ParseFrontmatterYAML(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return nil
+	}
+	var parsed map[string]any
+	if err := yaml.Unmarshal(raw, &parsed); err != nil {
+		return nil
+	}
+	return parsed
+}
+
 // stripFrontmatter returns content with any leading `---`-fenced YAML block
 // removed (the closing fence's trailing newline is consumed). If there's no
 // frontmatter, the original content is returned.

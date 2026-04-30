@@ -107,7 +107,7 @@ the text, then run the same URL-validation function on each match.-->
 - Discourage underscore based formatting
 - Discourage setext headings and trailing hash headings
 - Lack of space after # on a new line
-- HOoizontal rule either less or more than 3 characters ( ---, ***, ___)
+- Horizontal rule either less or more than 3 characters ( ---, ***, ___)
 - Inconsistent indent in nested list (2 vs 3 vs 4 spaces)
 - Triple-star `***word*` — ambiguous, often not what the author wanted.
 -  \* \_ \# \[ \]
@@ -131,7 +131,7 @@ the text, then run the same URL-validation function on each match.-->
 - Spaces inside emphasis markers
 
 ### Correctness
-- Word repitition like "the the"
+- Word repetition like "the the"
 - Frontmatter lint with strict warnings for anything that doesn't match the declared schema *in any way*
 - Doubled / malformed punctuation & dashes
   - —— (double em dash)

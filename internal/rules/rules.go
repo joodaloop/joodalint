@@ -1,6 +1,11 @@
 package rules
 
-import "github.com/joodaloop/hugolint/internal/config"
+import (
+	"bytes"
+
+	"github.com/joodaloop/hugolint/internal/config"
+	"github.com/yuin/goldmark/ast"
+)
 
 type Diagnostic struct {
 	Path    string
@@ -10,8 +15,31 @@ type Diagnostic struct {
 }
 
 type MarkdownFile struct {
-	Path    string
-	Content []byte
+	Path          string
+	Content       []byte
+	Body          []byte
+	AST           ast.Node
+	BodyStartLine int
+}
+
+func (f *MarkdownFile) LineAt(offset int) int {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > len(f.Body) {
+		offset = len(f.Body)
+	}
+	return bytes.Count(f.Body[:offset], []byte("\n")) + f.BodyStartLine
+}
+
+func (f *MarkdownFile) NodeLine(n ast.Node) int {
+	if t, ok := n.(*ast.Text); ok {
+		return f.LineAt(t.Segment.Start)
+	}
+	if lines := n.Lines(); lines != nil && lines.Len() > 0 {
+		return f.LineAt(lines.At(0).Start)
+	}
+	return f.BodyStartLine
 }
 
 type Asset struct {

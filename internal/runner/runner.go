@@ -13,6 +13,9 @@ import (
 
 	"golang.org/x/net/html"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/text"
+
 	"github.com/joodaloop/hugolint/internal/config"
 	"github.com/joodaloop/hugolint/internal/rules"
 )
@@ -32,17 +35,47 @@ func Markdown(cfg *config.Config) (int, error) {
 		return 0, err
 	}
 
-	ctx := &rules.MarkdownContext{Config: cfg}
-	rs := rules.Markdown()
+	mdCtx := &rules.MarkdownContext{Config: cfg}
+	fmCtx := &rules.FrontmatterContext{Config: cfg}
+	mdParser := goldmark.New().Parser()
+	legacy := rules.Markdown()
+	fmRules := rules.Frontmatter()
+	astRules := rules.MarkdownAST()
+	textRules := rules.MarkdownText()
+
 	diags := runParallel(paths, func(p string) []rules.Diagnostic {
 		b, err := os.ReadFile(p)
 		if err != nil {
 			return []rules.Diagnostic{{Path: p, Rule: "io", Message: err.Error()}}
 		}
-		f := &rules.MarkdownFile{Path: p, Content: b}
+
+		fmRaw, body, fmLines, fmStartLine := rules.SplitFrontmatter(b)
+		ff := &rules.FrontmatterFile{
+			Path:   p,
+			Raw:    fmRaw,
+			Parsed: rules.ParseFrontmatterYAML(fmRaw),
+			Line0:  fmStartLine,
+		}
+		mf := &rules.MarkdownFile{
+			Path:          p,
+			Content:       b,
+			Body:          body,
+			AST:           mdParser.Parse(text.NewReader(body)),
+			BodyStartLine: fmLines + 1,
+		}
+
 		var out []rules.Diagnostic
-		for _, r := range rs {
-			out = append(out, r.Check(f, ctx)...)
+		for _, r := range fmRules {
+			out = append(out, r.Check(ff, fmCtx)...)
+		}
+		for _, r := range astRules {
+			out = append(out, r.Check(mf, mdCtx)...)
+		}
+		for _, r := range textRules {
+			out = append(out, r.Check(mf, mdCtx)...)
+		}
+		for _, r := range legacy {
+			out = append(out, r.Check(mf, mdCtx)...)
 		}
 		return out
 	})
