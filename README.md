@@ -1,4 +1,4 @@
-# HUGOLINT
+# hugolint
 the sanest linter in the world
 
 ## CONFIGURATION
@@ -55,20 +55,18 @@ index_pages:
 
 ## WHAT DOES IT DO?
 
+### Frontmatter lint for anything that doesn't match the declared schema *in any way*
+
 ### Build lints (`hugolint build`)
-[ ] Check site build for orphans
-- Check that all relative links lead somewhere (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
+- Checks site build for orphan files (not linked to from anywhere)
+- Check for presense of essential meta tags
+- Check that all internal links point to an existing file (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
 - Run an HTML tidy/validator pass to catch escaping errors and malformed markup
 - Detect custom shortcode-like fragments
   - {{<
   -	\>}}
   - {{%
   - %}}
-- Unparsed Markdown link/image delimiters leaking as literal text
-  - (http
-  - )http
-  - [http
-  - ]http
 - HTML/comment markers that should be stripped or transformed
   - `<!--`
   - -->
@@ -94,13 +92,6 @@ index_pages:
   - URLs with whitespace, smart quotes, or trailing punctuation accidentally included
   - Image alt text missing in `![](url)`, `![ ](url)`, `![image](url)`, `![img](url) `
   - ](// — protocol-relative link
-- Spellcheck on prose with aspell with an personal dictionary
-
-<!--- Walk the AST.
-- For link/image/autolink nodes → pull URL from the node, run the URL-validation
-function.
-- For text nodes (skipping code/link descendants) → run the URL-finding regex on
-the text, then run the same URL-validation function on each match.-->
 
 ### Post-markdown checks
 - Headings must start at the beginning of the line
@@ -129,10 +120,13 @@ the text, then run the same URL-validation function on each match.-->
 - Balancing parens, quotes, formatting (** \`~~) and shortcode stuff ({{<)
 - `{{<shortcode>}}` without the required spaces
 - Spaces inside emphasis markers
-
-### Correctness
+- Spellcheck on prose with aspell with an personal dictionary
 - Word repetition like "the the"
-- Frontmatter lint with strict warnings for anything that doesn't match the declared schema *in any way*
+- Unparsed Markdown link/image delimiters leaking as literal text
+  - (http
+  - )http
+  - [http
+  - ]http
 - Doubled / malformed punctuation & dashes
   - —— (double em dash)
   - ——– (em dash + en dash)
