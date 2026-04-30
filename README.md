@@ -64,6 +64,8 @@ index_pages:
 - [ ] Run an HTML tidy/validator pass to catch escaping errors and malformed markup
   - [ ]	Check for a valid DOCTYPE, unclosed tags, and correct tag pairing.
   - [ ] Validates that IDs are unique across the page
+  - [ ] &amp;, &nbsp;, &#39; (unresolved HTML entities bleeding into plain text)
+  - [ ] â€™ or Ã© (Mojibake / character encoding failures)
 - [x] Detect custom shortcode-like fragments
     - {{<
     -	\>}}
@@ -79,12 +81,6 @@ index_pages:
     - `<q>`
     - `</q>`
     - `</q<`
-
-### Raw body checks
-- [ ] Discourage Setext headings
-- [ ] Discourage reference links
-- [ ] Catch emphasis flanking *foo*bar* parses as <em>foo</em>bar*
-- [ ] Discourage using smart quotes in content directly
 
 ### With-markdown AST 
 - [x] Warn on H1s (they should be in title: )
@@ -103,14 +99,14 @@ index_pages:
 
 
 ### Non-AST checks
-- [x] Broken Markdown
-  - [x] Headings must start at the beginning of the line
-  - [x] Lack of space after # on a new line
-  - [x] Horizontal rule failures ( -- on new lines)
-  - [x] Triple-star `***word*` — ambiguous, often not what the author wanted.
-  - [x] Warn on lack of space after > on new lines
-  - [x] Spaces inside emphasis markers (** text **)
-  - [x] Odd number of spaces/tabs for lists
+- [ ] Balancing parens, quotes, formatting (** \`~~) and shortcode delimiters ({{<)
+- [ ] Spellcheck on prose with aspell with an personal dictionary
+- [ ] Word repetition like "the the"
+- [ ] Suffix handling (2nd, 50kg vs 50 kg)
+- [ ] Discourage Setext headings
+- [ ] Discourage reference links
+- [ ] Catch emphasis flanking *foo*bar* parses as <em>foo</em>bar*
+- [ ] Discourage using smart/curvy quotes in content directly
 - [ ] URLs
   - [ ] (http
   - [ ] )http
@@ -123,27 +119,47 @@ index_pages:
   - [ ] [text] (url)
   - [ ] [text](url "title)
   - [ ] Discourage bare URLs in prose, they could start with either \n, " ", or "( but not []()"
-  - [ ] [text](/url-with space)
   - [ ] [text] (/url)
   - [ ] ![alt(image.png)
   - [ ] Reversed link syntax ()[]
-- [ ] Balancing parens, quotes, formatting (** \`~~) and shortcode delimiters ({{<)
-- [ ] Invisible characters
-- [ ] `{{<shortcode>}}` without the required spaces `{{< shortcode >}}`
-- [ ] Spellcheck on prose with aspell with an personal dictionary
-- [ ] Word repetition like "the the"
-- [ ] Suffix handling (2nd, 50kg vs 50 kg)
-- [ ] Doubled / malformed punctuation & dashes
-  - [ ] —— (double em dash)
-  - [ ] ——– (em dash + en dash)
-  - [ ] ————– (quadruple em + en)
-  - [ ] --- (literal triple hyphen)
-  - [ ] '' (double apostrophe)
-  - [ ] ,, (double commas)
-  - [ ]   `` (double backtick)
-  - [ ] ——– variants generally
-- [ ] Suspicious spacing
-  - [ ]  ) — space before closing paren
-  - [ ] " — floating/orphaned quote
-  - [ ] : — spaced colon
-  - [ ]  +- /  -+ — malformed plus-minus
+- [x] Broken Markdown
+  - [x] Headings must start at the beginning of the line
+  - [x] Lack of space after # on a new line
+  - [x] Horizontal rule failures ( -- on new lines)
+  - [x] Triple-star `***word*` — ambiguous, often not what the author wanted.
+  - [x] Warn on lack of space after > on new lines
+  - [ ] Warn on lack of space after - on new lines
+  - [x] Spaces inside emphasis markers (** text **)
+  - [x] Odd number of spaces/tabs for lists
+- [x] Invisible characters
+- [x] `{{<shortcode>}}` without the required spaces `{{< shortcode >}}`
+- [x] Doubled / malformed punctuation & dashes & suspicious spacing
+  - —— (double em dash)
+  - ——– (em dash + en dash)
+  - ————– (quadruple em + en)
+  - --- (literal triple hyphen)
+  - '' (double apostrophe)
+  - ,, (double commas)
+  - ..  (double period)
+  - `` (double backtick)
+  - ——– variants generally
+  -  ) — space before closing paren
+  -  , — space before comma
+  - " — floating/orphaned quote
+  - : — spaced colon
+  -  +- /  -+ — malformed plus-minus
+
+
+
+word.Word (missing space after punctuation)
+word/ word or word /word (asymmetrical spacing around a forward slash)
+" word " (padded spaces inside quotation marks)
+[word) (mismatched enclosure types)
+10 % (unnecessary space before a percent sign)
+$ 100 (space between currency symbol and number)
+#1 vs # 1 (inconsistent spacing with the hash/number sign)
+5'9" (using straight quotes) instead of 5′ 9″ (proper prime and double-prime symbols for feet/inches).
+word- word or word -word
+ -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
+ 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
+3x5 or 3 X 5 (using the letter "x") instead of the proper multiplication sign (3 × 5).

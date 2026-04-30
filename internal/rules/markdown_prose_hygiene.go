@@ -69,6 +69,12 @@ var literalPatterns = []literalPattern{
 	{",,", "double comma"},
 	{".. ", "double period"},
 	{" )", "space before closing paren"},
+	{"( ", "space after opening paren"},
+	{" ,", "space before comma"},
+	{" .", "space before period"},
+	{".  ", "double space after period"},
+	{" !", "space before exclamation mark"},
+	{" ?", "space before question mark"},
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
 }
