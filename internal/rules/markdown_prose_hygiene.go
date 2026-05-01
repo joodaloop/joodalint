@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -18,10 +19,6 @@ func (markdownProseHygiene) ID() string { return "prose-hygiene" }
 
 var (
 	wordSplit       = regexp.MustCompile(`[A-Za-z]+`)
-	mdLinkURL       = regexp.MustCompile(`\]\([^)]*\)`)
-	bareURL         = regexp.MustCompile(`https?://\S+`)
-	htmlTag         = regexp.MustCompile(`<[^>]+>`)
-	inlineCode      = regexp.MustCompile("`[^`]*`")
 	spacedColon     = regexp.MustCompile(` : `)
 	plusMinus       = regexp.MustCompile(` \+-|\s-\+`)
 	hrLine          = regexp.MustCompile(`^\s*-{3,}\s*$`)
@@ -96,6 +93,94 @@ var literalPatterns = []literalPattern{
 	{`===`, "Setext headers, brittle"},
 }
 
+var literalLeadBytes = func() []byte {
+	seen := make(map[byte]struct{}, len(literalPatterns))
+	out := make([]byte, 0, len(literalPatterns))
+	for _, p := range literalPatterns {
+		if len(p.needle) == 0 {
+			continue
+		}
+		b := p.needle[0]
+		if _, ok := seen[b]; ok {
+			continue
+		}
+		seen[b] = struct{}{}
+		out = append(out, b)
+	}
+	slices.Sort(out)
+	return out
+}()
+
+func containsAnyByte(s string, chars []byte) bool {
+	for i := 0; i < len(s); i++ {
+		if _, ok := slices.BinarySearch(chars, s[i]); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func stripProseMarkup(text string) string {
+	if !strings.ContainsAny(text, "]<`hH") {
+		return text
+	}
+
+	var b strings.Builder
+	b.Grow(len(text))
+
+	for i := 0; i < len(text); {
+		switch text[i] {
+		case ']':
+			if i+1 < len(text) && text[i+1] == '(' {
+				j := i + 2
+				for j < len(text) && text[j] != ')' {
+					j++
+				}
+				if j < len(text) {
+					b.WriteByte(']')
+					i = j + 1
+					continue
+				}
+			}
+		case '`':
+			j := i + 1
+			for j < len(text) && text[j] != '`' {
+				j++
+			}
+			if j < len(text) {
+				b.WriteByte(' ')
+				i = j + 1
+				continue
+			}
+		case '<':
+			j := i + 1
+			for j < len(text) && text[j] != '>' {
+				j++
+			}
+			if j < len(text) {
+				b.WriteByte(' ')
+				i = j + 1
+				continue
+			}
+		case 'h', 'H':
+			if strings.HasPrefix(text[i:], "http://") || strings.HasPrefix(text[i:], "https://") ||
+				strings.HasPrefix(text[i:], "HTTP://") || strings.HasPrefix(text[i:], "HTTPS://") {
+				j := i
+				for j < len(text) && text[j] > ' ' {
+					j++
+				}
+				b.WriteByte(' ')
+				i = j
+				continue
+			}
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+
+	return b.String()
+}
+
 func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 	var diags []Diagnostic
 	scanner := bufio.NewScanner(bytes.NewReader(f.Body))
@@ -141,10 +226,7 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 
 		// Word repetition. Strip link URLs, inline code, and HTML tags so
 		// `[Foo](/foo)` and `<li>...</li>` don't tokenize as repeated words.
-		prose := mdLinkURL.ReplaceAllString(text, "]")
-		prose = bareURL.ReplaceAllString(prose, " ")
-		prose = inlineCode.ReplaceAllString(prose, " ")
-		prose = htmlTag.ReplaceAllString(prose, " ")
+		prose := stripProseMarkup(text)
 		idx := wordSplit.FindAllStringIndex(prose, -1)
 		for i := 1; i < len(idx); i++ {
 			gap := prose[idx[i-1][1]:idx[i][0]]
@@ -177,12 +259,14 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		}
 
 		// Literal substring patterns.
-		for _, p := range literalPatterns {
-			if strings.Contains(text, p.needle) {
-				diags = append(diags, Diagnostic{
-					Path: f.Path, Line: line, Rule: "prose-hygiene",
-					Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
-				})
+		if containsAnyByte(text, literalLeadBytes) {
+			for _, p := range literalPatterns {
+				if strings.Contains(text, p.needle) {
+					diags = append(diags, Diagnostic{
+						Path: f.Path, Line: line, Rule: "prose-hygiene",
+						Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
+					})
+				}
 			}
 		}
 
@@ -198,166 +282,172 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		}
 
 		// Regex spacing patterns.
-		if spacedColon.MatchString(text) {
+		if strings.Contains(text, " : ") && spacedColon.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "spaced colon ( : )",
 			})
 		}
-		if mixedDashes.MatchString(text) {
+		if strings.ContainsAny(text, "—–") && mixedDashes.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "malformed dash sequence (mixed em/en or 3+ dashes)",
 			})
 		}
-		if floatingQuote.MatchString(text) {
+		if strings.Contains(text, "\"") && floatingQuote.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: `floating/orphaned quote (")`,
 			})
 		}
-		if shortcodeOpen.MatchString(text) || shortcodeClose.MatchString(text) {
+		if strings.Contains(text, "{{") && (shortcodeOpen.MatchString(text) || shortcodeClose.MatchString(text)) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "Hugo shortcode missing required spaces ({{< name >}})",
 			})
 		}
-		if plusMinus.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "malformed plus-minus (use ±)",
-			})
+		if strings.Contains(text, "+-") || strings.Contains(text, "-+") {
+			if plusMinus.MatchString(text) {
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: line, Rule: "prose-hygiene",
+					Message: "malformed plus-minus (use ±)",
+				})
+			}
 		}
-		if reversedLink.MatchString(text) {
+		if strings.ContainsAny(text, "([") && reversedLink.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "reversed link syntax (use [text](url))",
 			})
 		}
-		if referenceLink.MatchString(text) {
+		if strings.Count(text, "[") >= 2 && referenceLink.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "Avoid using reference links (use [text](url))",
 			})
 		}
-		if bulletNoSpace.MatchString(text) && !emphasisLine.MatchString(text) {
+		if len(text) > 0 && strings.ContainsAny(text[:min(4, len(text))], "-+*") &&
+			bulletNoSpace.MatchString(text) && !emphasisLine.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "list bullet without space after marker",
 			})
 		}
-		if blockquoteNoSp.MatchString(text) {
+		if strings.Contains(text, ">") && blockquoteNoSp.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "blockquote > without space after",
 			})
 		}
-		if !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
+		hasStar := strings.Contains(text, "*")
+		if hasStar && !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "spaces inside emphasis markers (* text *)",
 			})
 		}
-		if underscoreEmph.MatchString(" " + prose) {
+		if strings.Contains(prose, "_") && underscoreEmph.MatchString(" "+prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "underscore emphasis (use * instead)",
 			})
 		}
-		if headingIndented.MatchString(text) {
+		if len(text) > 0 && (text[0] == ' ' || text[0] == '\t') && strings.Contains(text, "#") && headingIndented.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "heading must start at the beginning of the line",
 			})
 		}
-		if headingNoSpace.MatchString(text) {
+		if strings.HasPrefix(text, "#") && headingNoSpace.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "missing space after # in heading",
 			})
 		}
-		if brokenHRDouble.MatchString(text) {
+		if strings.Contains(text, "--") && brokenHRDouble.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "broken horizontal rule (use --- not --)",
 			})
 		}
-		if oddListIndent.MatchString(text) {
+		if len(text) > 0 && (text[0] == ' ' || text[0] == '\t') && strings.ContainsAny(text, "-+*") && oddListIndent.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "odd indentation before list marker",
 			})
 		}
-		if missingSpacePunct.MatchString(prose) {
+		if strings.ContainsAny(prose, ".!?;,") && missingSpacePunct.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "missing space after punctuation",
 			})
 		}
-		if asymSlash.MatchString(prose) {
+		if strings.Contains(prose, "/") && asymSlash.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "asymmetrical spacing around /",
 			})
 		}
-		if paddedQuote.MatchString(prose) {
+		if strings.Contains(prose, "\"") && paddedQuote.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: `padded spaces inside quotation marks (" word ")`,
 			})
 		}
-		if spacedPercent.MatchString(text) {
+		if strings.Contains(text, " %") && spacedPercent.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "space before percent sign (10 %)",
 			})
 		}
-		if spacedCurrency.MatchString(text) {
+		if strings.ContainsAny(text, "$£€¥") && spacedCurrency.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "space between currency symbol and number ($ 100)",
 			})
 		}
-		if spacedHash.MatchString(text) {
+		if strings.Contains(text, "#") && spacedHash.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "space after # before number (# 1, prefer #1)",
 			})
 		}
-		if straightPrimes.MatchString(text) {
+		if strings.Contains(text, "'") && strings.Contains(text, "\"") && straightPrimes.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "straight quotes for feet/inches (use ′ ″)",
 			})
 		}
-		if asymHyphen.MatchString(prose) {
+		if strings.Contains(prose, "-") && asymHyphen.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "asymmetrical spacing around hyphen",
 			})
 		}
-		if hyphenMinus.MatchString(text) {
+		if strings.Contains(text, "-") && hyphenMinus.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "hyphen used as minus sign (use −)",
 			})
 		}
-		if hyphenRange.MatchString(text) {
+		if strings.Contains(text, "-") && hyphenRange.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "hyphen in numeric range (use en dash –)",
 			})
 		}
-		for _, m := range tripleStarOpen.FindAllStringIndex(text, -1) {
-			end := m[1]
-			if end < len(text) && text[end] == '*' {
-				continue
+		if hasStar {
+			for _, m := range tripleStarOpen.FindAllStringIndex(text, -1) {
+				end := m[1]
+				if end < len(text) && text[end] == '*' {
+					continue
+				}
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: line, Rule: "prose-hygiene",
+					Message: "ambiguous triple-star emphasis (***word*)",
+				})
+				break
 			}
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "ambiguous triple-star emphasis (***word*)",
-			})
-			break
 		}
 	}
 	return diags
