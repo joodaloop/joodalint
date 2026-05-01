@@ -154,7 +154,7 @@ func ParseFrontmatterYAML(raw []byte) (map[string]any, error) {
 
 func validate(name string, val any, spec config.FieldSpec) string {
 	switch spec.Type {
-	case "string":
+	case "string", "text":
 		s, ok := val.(string)
 		if !ok {
 			return fmt.Sprintf("field %q: expected string, got %s", name, kindOf(val))
