@@ -263,6 +263,9 @@ func proseSpanChecks(f *MarkdownFile, sp ProseSpan) []Diagnostic {
 	if strings.Contains(text, "#") && spacedHash.MatchString(text) {
 		emit("space after # before number (# 1, prefer #1)")
 	}
+	if strings.ContainsAny(text, "–-") && spacedDashNum.MatchString(text) {
+		emit("space between hyphen/en-dash and number ( – 10)")
+	}
 	if missingSpacePunct.MatchString(text) {
 		emit("missing space after punctuation")
 	}

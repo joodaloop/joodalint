@@ -72,14 +72,13 @@ index_pages:
     - `<!--`
     - -->
     - <--
-    - <—
-    - —>
+    - <— / —> 
     - `<del>`
     - `<q>`
     - `</q>`
     - `</q<`
   
-### With-markdown AST 
+### Markdown elements from AST 
 - [x] Warn on H1s (they should be in frontmatter title)
 - [x] Warn on any heading more than 4
 - [x] Too long link text, code formatting, bold, italic, etc.
@@ -88,7 +87,7 @@ index_pages:
   - [ ] Duplicate trailing slashes, double slashes in paths
   - [x] Catch mailto: addresses that aren’t valid email syntax
   - [x] Don't allow http:// 
-  - [x] Empty URLs or empty URL text/alt
+  - [x] Empty URLs or empty/meaningless URL text/alt
   - [x] Don't allow relative links
   - [x] Catch non-URL-safe characters inside URL
   - [x] Discourage protocol-relative link
@@ -100,7 +99,35 @@ index_pages:
 - [x] Spellcheck on prose with aspell with an personal dictionary
 - [x] Suffix handling (2nd, 50kg vs 50 kg)
 - [x] Unbalanced parens and quotes
-- [x] word.Word (missing space after punctuation)
+- [x] Repetitions
+  - word.Word (missing space after punctuation)
+  - -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
+  - " : "— spaced colon
+  - 10 % (unnecessary space before a percent sign)
+  - $ ($ £ € ¥) 100 — space between currency symbol and number)
+  - #1 vs # 1 (inconsistent spacing with the hash/number sign)
+  - —— (double em dash)
+  - ——– (em dash + en dash)
+  - ————– (quadruple em + en)
+  - --- (literal triple hyphen)
+  - – 10 (space between hyphen/en-dash and number)
+  - " . " — space around period
+  - ! — space before exclamation mark
+  - ? — space before question mark
+  - '' (double apostrophe)
+  - ,, (double commas)
+  - ..  (double period)
+  - `` (double backtick)
+  - ——– variants generally
+  -  ) — space before closing paren
+  -  , — space before comma
+  - " — floating/orphaned quote
+  -  +- /  -+ — malformed plus-minus
+  - word/ word or word /word (asymmetrical spacing around a forward slash)
+  - " word " (padded spaces inside quotation marks)
+  - (  — space after opening paren  
+  - word- word or word -word (space around hypen)
+  - 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
 
 ### Non-AST checks
 - [x] Discourage using smart/curvy quotes in content directly
@@ -121,6 +148,7 @@ index_pages:
   - [x] Reversed link syntax ()[]
 - [x] Discourage reference links
 - [x] Discourage Setext headings 
+- [x] __ underscore emphasis detection
 - [x] Broken Markdown
   - [x] Headings must start at the beginning of the line
   - [x] Lack of space after # on a new line
@@ -133,57 +161,5 @@ index_pages:
 - [x] Invisible characters
 - [x] `{{<shortcode>}}` without the required spaces `{{< shortcode >}}`
 - [x] Doubled / malformed punctuation & dashes & suspicious spacing
-  - —— (double em dash)
-  - ——– (em dash + en dash)
-  - ————– (quadruple em + en)
-  - --- (literal triple hyphen)
-  - '' (double apostrophe)
-  - ,, (double commas)
-  - ..  (double period)
-  - `` (double backtick)
-  - ——– variants generally
-  -  ) — space before closing paren
-  -  , — space before comma
-  - " — floating/orphaned quote
-  - : — spaced colon
-  -  +- /  -+ — malformed plus-minus
-  - word/ word or word /word (asymmetrical spacing around a forward slash)
-  - " word " (padded spaces inside quotation marks)
-  - 10 % (unnecessary space before a percent sign)
-  - $ 100 (space between currency symbol and number)
-  - #1 vs # 1 (inconsistent spacing with the hash/number sign)
   - 5'9" (using straight quotes) instead of 5′ 9″ (proper prime).
-  - word- word or word -word (space around hypen)
-  - -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
-  - 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
-
-  - – 10 (unnecessary space between hypen (or en dash) and number)
-
-
-(  — space after opening paren
-. — space around period
- ! — space before exclamation mark
- ? — space before question mark
-__ underscore emphasis detection
-</q< in rendered text
-<— / —> in rendered text
-" ]( quote glued to link
-Generic/useless image alt text (image-alt rule)
-Punctuation at end of link text (link-punctuation rule)
-Extra spaces inside link text (spaces-around-link rule)
-/* / */ — stray code-comment markers in rendered text
-Currency check covers $ £ € ¥ (README only mentions $ 100)
-
-
-
-### MISSING
-.. (double period)	Line 142 — under "Doubled / malformed punctuation"	Not in any literal pattern or regex in the code
-– 10 (space between hyphen/en-dash and number)	Line 160	No check exists for this pattern
--10 (hyphen vs −10 minus sign)	Line 157 — listed under "Non-AST checks"	Only in AST-path (markdown_prose_ast.go:212, proseBlockChecks), not in the line-by-line non-AST scanner
-100-200 (hyphen vs en dash – for ranges)	Line 158 — listed under "Non-AST checks"	Only in AST-path (markdown_prose_ast.go:215, proseBlockChecks), not in the line-by-line non-AST scanner
-
-
-(http	[ ] under Non-AST URLs	html_artifacts.go:22 (build lint — detects leaked text in rendered HTML)
-)http	[ ] under Non-AST URLs	html_artifacts.go:23
-[http	[ ] under Non-AST URLs	html_artifacts.go:24
-]http	[ ] under Non-A	html_artifacts.go:25
+  - " ]( quote glued to link

@@ -50,6 +50,7 @@ var (
 	spacedPercent     = regexp.MustCompile(`\d %`)
 	spacedCurrency    = regexp.MustCompile(`[$£€¥] \d`)
 	spacedHash        = regexp.MustCompile(`[^#]# \d`)
+	spacedDashNum     = regexp.MustCompile(`[–-] \d`)
 	straightPrimes    = regexp.MustCompile(`\d'\d+"`)
 	asymHyphen        = regexp.MustCompile(`[A-Za-z]- [A-Za-z]|[A-Za-z] -[A-Za-z]`)
 	hyphenMinus       = regexp.MustCompile(`(?:^|\s)-\d+(?:\s|$|[.,;:!?])`)
