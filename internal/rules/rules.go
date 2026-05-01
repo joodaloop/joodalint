@@ -21,6 +21,22 @@ type MarkdownFile struct {
 	Body          []byte
 	AST           ast.Node
 	BodyStartLine int
+	// ProseBlocks is the post-parse flattening of inline prose: each
+	// top-level prose block (paragraph, heading, list-item text block,
+	// HTML block) becomes one entry. Code blocks, code spans, link URLs,
+	// and autolink targets are excluded; link text, image alt text, and
+	// raw inline HTML are included. Spans carry byte offsets into Body
+	// so callers resolve lines via LineAt at diagnostic time.
+	ProseBlocks []ProseBlock
+}
+
+type ProseSpan struct {
+	Text   []byte
+	Offset int // byte offset into MarkdownFile.Body
+}
+
+type ProseBlock struct {
+	Spans []ProseSpan
 }
 
 func (f *MarkdownFile) LineAt(offset int) int {

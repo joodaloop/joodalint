@@ -18,7 +18,7 @@ func (markdownFormatting) ID() string { return "formatting" }
 
 // maxInlineSpan is the length threshold (in characters) above which
 // inline formatting is reported as suspicious.
-const maxInlineSpan = 100
+const maxInlineSpan = 120
 
 func (markdownFormatting) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 	if f.AST == nil {

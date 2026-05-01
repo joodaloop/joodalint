@@ -39,7 +39,7 @@ func (markdownHeadingsAST) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnost
 		if h.Level > 4 {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: f.NodeLine(h), Rule: "headings",
-				Message: fmt.Sprintf("h%d heading too deep — restructure to use h4 or shallower", h.Level),
+				Message: fmt.Sprintf("h%d heading too deep", h.Level),
 			})
 		}
 		return ast.WalkContinue, nil

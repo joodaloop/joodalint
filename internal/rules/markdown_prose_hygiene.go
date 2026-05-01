@@ -16,6 +16,11 @@ type markdownProseHygiene struct{}
 
 func (markdownProseHygiene) ID() string { return "prose-hygiene" }
 
+// Regexes are split between this file and markdown_prose_ast.go: the
+// structural/line-shape patterns stay here because they exist precisely
+// to catch syntax that the AST won't recognise as the construct the
+// author was attempting. The content-prose patterns live alongside
+// the AST rule.
 var (
 	wordSplit       = regexp.MustCompile(`[A-Za-z]+`)
 	spacedColon     = regexp.MustCompile(` : `)
@@ -68,88 +73,16 @@ type literalPattern struct {
 	msg    string
 }
 
+// literalPatterns covers structural/source-level needles that must be
+// scanned line-by-line: link/HR syntax that the AST won't expose as a
+// "broken" version of the construct, plus the brittle setext header
+// marker. Content-level needles (e.g. " ,", "——") live in
+// markdown_prose_ast.go and run against ProseBlock spans.
 var literalPatterns = []literalPattern{
-	{"——", "double em dash"},
 	{"---", "literal triple hyphen (use em dash —)"},
-	{"''", "double apostrophe"},
-	{"``", "double backtick"},
-	{"“", "opening smart quote"},
-	{"”", "closing smart quote"},
-	// {"‘", "opening curvy apostrophe"},
-	// {"’", "closing curvy apostrophe"},
-	{",,", "double comma"},
-	// {".. ", "double period"},
-	{" )", "space before closing paren"},
-	{"( ", "space after opening paren"},
-	{" ,", "space before comma"},
-	{" .", "space before period"},
-	{".  ", "double space after period"},
-	{" !", "space before exclamation mark"},
-	{" ?", "space before question mark"},
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
 	{`===`, "Setext headers, brittle"},
-}
-
-func stripProseMarkup(text string) string {
-	if !strings.ContainsAny(text, "]<`hH") {
-		return text
-	}
-
-	var b strings.Builder
-	b.Grow(len(text))
-
-	for i := 0; i < len(text); {
-		switch text[i] {
-		case ']':
-			if i+1 < len(text) && text[i+1] == '(' {
-				j := i + 2
-				for j < len(text) && text[j] != ')' {
-					j++
-				}
-				if j < len(text) {
-					b.WriteByte(']')
-					i = j + 1
-					continue
-				}
-			}
-		case '`':
-			j := i + 1
-			for j < len(text) && text[j] != '`' {
-				j++
-			}
-			if j < len(text) {
-				b.WriteByte(' ')
-				i = j + 1
-				continue
-			}
-		case '<':
-			j := i + 1
-			for j < len(text) && text[j] != '>' {
-				j++
-			}
-			if j < len(text) {
-				b.WriteByte(' ')
-				i = j + 1
-				continue
-			}
-		case 'h', 'H':
-			if strings.HasPrefix(text[i:], "http://") || strings.HasPrefix(text[i:], "https://") ||
-				strings.HasPrefix(text[i:], "HTTP://") || strings.HasPrefix(text[i:], "HTTPS://") {
-				j := i
-				for j < len(text) && text[j] > ' ' {
-					j++
-				}
-				b.WriteByte(' ')
-				i = j
-				continue
-			}
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-
-	return b.String()
 }
 
 func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
@@ -195,29 +128,6 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 			continue
 		}
 
-		// Word repetition. Strip link URLs, inline code, and HTML tags so
-		// `[Foo](/foo)` and `<li>...</li>` don't tokenize as repeated words.
-		prose := stripProseMarkup(text)
-		idx := wordSplit.FindAllStringIndex(prose, -1)
-		for i := 1; i < len(idx); i++ {
-			gap := prose[idx[i-1][1]:idx[i][0]]
-			if !strings.ContainsAny(gap, " \t") {
-				continue
-			}
-			if strings.ContainsAny(gap, ".!?,;:&([])") {
-				continue
-			}
-			a := strings.ToLower(prose[idx[i-1][0]:idx[i-1][1]])
-			b := strings.ToLower(prose[idx[i][0]:idx[i][1]])
-			if a != b {
-				continue
-			}
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: fmt.Sprintf("repeated word: %q", a+" "+a),
-			})
-		}
-
 		// Invisible / zero-width characters.
 		for _, r := range text {
 			if name, ok := invisibleChars[r]; ok {
@@ -229,7 +139,7 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 			}
 		}
 
-		// Literal substring patterns.
+		// Literal substring patterns (structural needles only).
 		for _, p := range literalPatterns {
 			if strings.Contains(text, p.needle) {
 				diags = append(diags, Diagnostic{
@@ -239,49 +149,21 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 			}
 		}
 
-		// Skip horizontal-rule lines for the dash-heavy regex checks below
-		// (the literal `---` check already fires only when other content is on the line —
-		// strings.Contains on a pure `---` line will still match, so guard explicitly).
+		// HR lines look like a literal `---`. Drop the false positive
+		// emitted just above by the literalPatterns loop.
 		if hrLine.MatchString(text) {
-			// Strip the false positive emitted above for `---` on a pure HR line.
 			if n := len(diags); n > 0 && strings.Contains(diags[n-1].Message, `"---"`) {
 				diags = diags[:n-1]
 			}
 			continue
 		}
 
-		// Regex spacing patterns.
-		if strings.Contains(text, " : ") && spacedColon.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "spaced colon ( : )",
-			})
-		}
-		if strings.ContainsAny(text, "—–") && mixedDashes.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "malformed dash sequence (mixed em/en or 3+ dashes)",
-			})
-		}
-		if strings.Contains(text, "\"") && floatingQuote.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: `floating/orphaned quote (")`,
-			})
-		}
+		// Hugo shortcode spacing — keep line-based; applies uniformly.
 		if strings.Contains(text, "{{") && (shortcodeOpen.MatchString(text) || shortcodeClose.MatchString(text)) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "Hugo shortcode missing required spaces ({{< name >}})",
 			})
-		}
-		if strings.Contains(text, "+-") || strings.Contains(text, "-+") {
-			if plusMinus.MatchString(text) {
-				diags = append(diags, Diagnostic{
-					Path: f.Path, Line: line, Rule: "prose-hygiene",
-					Message: "malformed plus-minus (use ±)",
-				})
-			}
 		}
 		if strings.ContainsAny(text, "([") && reversedLink.MatchString(text) {
 			diags = append(diags, Diagnostic{
@@ -308,18 +190,6 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 				Message: "blockquote > without space after",
 			})
 		}
-		if strings.Contains(text, "*") && !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "spaces inside emphasis markers (* text *)",
-			})
-		}
-		if strings.Contains(prose, "_") && underscoreEmph.MatchString(" "+prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "underscore emphasis (use * instead)",
-			})
-		}
 		if len(text) > 0 && (text[0] == ' ' || text[0] == '\t') && strings.Contains(text, "#") && headingIndented.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
@@ -344,64 +214,10 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 				Message: "odd indentation before list marker",
 			})
 		}
-		if strings.ContainsAny(prose, ".!?;,") && missingSpacePunct.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "missing space after punctuation",
-			})
-		}
-		if strings.Contains(prose, "/") && asymSlash.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "asymmetrical spacing around /",
-			})
-		}
-		if strings.Contains(prose, "\"") && paddedQuote.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: `padded spaces inside quotation marks (" word ")`,
-			})
-		}
-		if strings.Contains(text, " %") && spacedPercent.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "space before percent sign (10 %)",
-			})
-		}
-		if strings.ContainsAny(text, "$£€¥") && spacedCurrency.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "space between currency symbol and number ($ 100)",
-			})
-		}
-		if strings.Contains(text, "#") && spacedHash.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "space after # before number (# 1, prefer #1)",
-			})
-		}
 		if strings.Contains(text, "'") && strings.Contains(text, "\"") && straightPrimes.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "straight quotes for feet/inches (use ′ ″)",
-			})
-		}
-		if strings.Contains(prose, "-") && asymHyphen.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "asymmetrical spacing around hyphen",
-			})
-		}
-		if strings.Contains(prose, "-") && hyphenMinus.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "hyphen used as minus sign (use −)",
-			})
-		}
-		if strings.Contains(prose, "-") && hyphenRange.MatchString(prose) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "hyphen in numeric range (use en dash –)",
 			})
 		}
 	}

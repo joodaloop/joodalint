@@ -57,12 +57,14 @@ func Markdown(cfg *config.Config) (int, error) {
 			ParseErr: fmParseErr,
 			Line0:    fmStartLine,
 		}
+		astRoot := mdParser.Parse(text.NewReader(body))
 		mf := &rules.MarkdownFile{
 			Path:          p,
 			Content:       b,
 			Body:          body,
-			AST:           mdParser.Parse(text.NewReader(body)),
+			AST:           astRoot,
 			BodyStartLine: fmLines + 1,
+			ProseBlocks:   rules.FlattenProse(body, astRoot),
 		}
 
 		var out []rules.Diagnostic
@@ -421,6 +423,9 @@ func runFiles[T any](items []T, fn func(T) []rules.Diagnostic) []rules.Diagnosti
 
 func report(diags []rules.Diagnostic) {
 	sort.Slice(diags, func(i, j int) bool {
+		if diags[i].Rule != diags[j].Rule {
+			return diags[i].Rule < diags[j].Rule
+		}
 		if diags[i].Path != diags[j].Path {
 			return diags[i].Path < diags[j].Path
 		}

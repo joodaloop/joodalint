@@ -16,12 +16,14 @@ var testParser = goldmark.New().Parser()
 func mdFile(content string) *MarkdownFile {
 	b := []byte(content)
 	_, body, fmLines, _ := SplitFrontmatter(b)
+	astRoot := testParser.Parse(text.NewReader(body))
 	return &MarkdownFile{
 		Path:          "test.md",
 		Content:       b,
 		Body:          body,
-		AST:           testParser.Parse(text.NewReader(body)),
+		AST:           astRoot,
 		BodyStartLine: fmLines + 1,
+		ProseBlocks:   FlattenProse(body, astRoot),
 	}
 }
 

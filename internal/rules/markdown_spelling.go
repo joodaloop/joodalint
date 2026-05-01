@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"sync"
@@ -33,7 +32,21 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 		return nil
 	}
 
-	unknown, err := sharedSpeller.unknown(f.Body)
+	// Build a single buffer of post-parse prose, NUL-separated so words
+	// can't merge across span boundaries.
+	var buf bytes.Buffer
+	for _, blk := range f.ProseBlocks {
+		for _, sp := range blk.Spans {
+			buf.Write(sp.Text)
+			buf.WriteByte(0)
+		}
+		buf.WriteByte(0)
+	}
+	if buf.Len() == 0 {
+		return nil
+	}
+
+	unknown, err := sharedSpeller.unknown(buf.Bytes())
 	if err != nil {
 		return []Diagnostic{{Path: f.Path, Rule: "spelling", Message: err.Error()}}
 	}
@@ -41,25 +54,22 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 		return nil
 	}
 
-	// Locate each unknown word's first occurrence in the original content
-	// for line-numbered diagnostics.
 	wordRe := buildWordRegex(unknown)
 	var diags []Diagnostic
 	seen := map[string]bool{}
-	lineScanner := bufio.NewScanner(bytes.NewReader(f.Body))
-	lineScanner.Buffer(make([]byte, 64*1024), 1024*1024)
-	line := f.BodyStartLine - 1
-	for lineScanner.Scan() {
-		line++
-		for _, m := range wordRe.FindAllString(lineScanner.Text(), -1) {
-			if seen[m] {
-				continue
+	for _, blk := range f.ProseBlocks {
+		for _, sp := range blk.Spans {
+			for _, m := range wordRe.FindAllIndex(sp.Text, -1) {
+				word := string(sp.Text[m[0]:m[1]])
+				if seen[word] {
+					continue
+				}
+				seen[word] = true
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: f.LineAt(sp.Offset + m[0]), Rule: "spelling",
+					Message: fmt.Sprintf("unknown word: %q", word),
+				})
 			}
-			seen[m] = true
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "spelling",
-				Message: fmt.Sprintf("unknown word: %q", m),
-			})
 		}
 	}
 	return diags

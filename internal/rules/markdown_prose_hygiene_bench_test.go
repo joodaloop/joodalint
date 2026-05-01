@@ -26,7 +26,6 @@ func synthMarkdown(lines int) []byte {
 		"code := fence.Block(\"with content\")",
 		"```",
 		"A line with a typo: the the duplicate word should fire prose-hygiene.",
-		"Another line with  double  spaces but otherwise unremarkable content here.",
 		"Mixed punctuation,like this,no space after comma, would fire missing-space-after-punct.",
 		"Ranges like 10-20 and 1990-1999 may fire the hyphen-range rule.",
 		"Currency $ 100 with a space between symbol and number.",

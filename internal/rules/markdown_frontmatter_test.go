@@ -153,7 +153,7 @@ func TestFrontmatter_UnknownFieldDeterministic(t *testing.T) {
 	}
 }
 
-func TestFrontmatter_AlwaysRequiresTitleAndDescription(t *testing.T) {
+func TestFrontmatter_AlwaysRequiresTitleNotDescription(t *testing.T) {
 	cfg := &config.Config{Paths: config.Paths{MarkdownRoot: "content"}}
 	ctx := &FrontmatterContext{Config: cfg}
 	src := "---\nfoo: bar\n---\nbody\n"
@@ -161,8 +161,8 @@ func TestFrontmatter_AlwaysRequiresTitleAndDescription(t *testing.T) {
 	if !containsMsg(d, `missing required field "title"`) {
 		t.Errorf("want missing title, got %v", messages(d))
 	}
-	if !containsMsg(d, `missing required field "description"`) {
-		t.Errorf("want missing description, got %v", messages(d))
+	if containsMsg(d, `missing required field "description"`) {
+		t.Errorf("description should not be required by default, got %v", messages(d))
 	}
 }
 

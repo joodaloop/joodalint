@@ -29,16 +29,26 @@ func TestBalance_Mismatch(t *testing.T) {
 	}
 }
 
-func TestBalance_OddQuotes(t *testing.T) {
-	diags := markdownBalance{}.Check(mdFile(`He said "hello` + "\n"), nil)
+func TestBalance_OddQuotes_NowOwnedByProseHygiene(t *testing.T) {
+	// Quote balance moved to prose-hygiene; the balance rule should no
+	// longer fire on odd quote counts.
+	src := `He said "hello` + "\n"
+	balDiags := markdownBalance{}.Check(mdFile(src), nil)
+	if len(balDiags) != 0 {
+		t.Fatalf("balance rule should no longer flag quotes, got %v", messages(balDiags))
+	}
+	diags := markdownProseHygieneAST{}.Check(mdFile(src), nil)
 	if !containsMsg(diags, "unbalanced") {
-		t.Fatalf("want unbalanced quotes, got %v", messages(diags))
+		t.Fatalf("want unbalanced quotes from prose-hygiene, got %v", messages(diags))
 	}
 }
 
 func TestBalance_EvenQuotes(t *testing.T) {
-	diags := markdownBalance{}.Check(mdFile(`He said "hello world"` + "\n"), nil)
-	assertNoDiags(t, diags)
+	src := `He said "hello world"` + "\n"
+	assertNoDiags(t, markdownBalance{}.Check(mdFile(src), nil))
+	if containsMsg(markdownProseHygieneAST{}.Check(mdFile(src), nil), "unbalanced") {
+		t.Fatal("even quotes should not trigger unbalanced diag")
+	}
 }
 
 func TestBalance_BackslashEscape(t *testing.T) {

@@ -25,7 +25,7 @@ func (markdownImageAlt) ID() string { return "image-alt" }
 // genericAlts are non-empty alt strings that convey no useful information.
 // Empty/whitespace alts are reported by the empty-image-alt diagnostic
 // inside markdownURLs.
-const maxLinkTextLen = 100
+const maxLinkTextLen = 120
 
 var genericAlts = map[string]bool{
 	"image":      true,
@@ -127,11 +127,13 @@ func (markdownURLs) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagnostic {
 					})
 				}
 				if text != "" {
-					if last := text[len(text)-1]; strings.ContainsRune(".,;:!?'\"()", rune(last)) {
-						diags = append(diags, Diagnostic{
-							Path: f.Path, Line: line, Rule: "link-punctuation",
-							Message: fmt.Sprintf("link includes trailing %q", string(last)),
-						})
+					if last := text[len(text)-1]; strings.ContainsRune(`.,;:!?'"()`, rune(last)) {
+						if !(last == ')' && strings.ContainsRune(text[:len(text)-1], '(')) {
+							diags = append(diags, Diagnostic{
+								Path: f.Path, Line: line, Rule: "link-punctuation",
+								Message: fmt.Sprintf("link includes trailing %q", string(last)),
+							})
+						}
 					}
 				}
 			}

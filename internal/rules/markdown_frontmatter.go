@@ -83,27 +83,28 @@ const descriptionMaxLen = 160
 
 func checkTitleDescription(path string, line int, parsed map[string]any, schema map[string]config.FieldSpec) []Diagnostic {
 	var diags []Diagnostic
-	for _, name := range []string{"title", "description"} {
-		_, schemaCovers := schema[name]
-		val, present := parsed[name]
-		if !present {
-			if !schemaCovers {
-				diags = append(diags, Diagnostic{
-					Path: path, Line: line, Rule: "frontmatter",
-					Message: fmt.Sprintf("missing required field %q", name),
-				})
-			}
-			continue
-		}
-		if name == "description" {
-			if s, ok := val.(string); ok && len([]rune(s)) > descriptionMaxLen {
-				diags = append(diags, Diagnostic{
-					Path: path, Line: line, Rule: "frontmatter",
-					Message: fmt.Sprintf("field %q: length %d above max %d", name, len([]rune(s)), descriptionMaxLen),
-				})
-			}
+
+	// Title is always required unless the schema explicitly covers it.
+	if _, schemaCovers := schema["title"]; !schemaCovers {
+		if _, present := parsed["title"]; !present {
+			diags = append(diags, Diagnostic{
+				Path: path, Line: line, Rule: "frontmatter",
+				Message: `missing required field "title"`,
+			})
 		}
 	}
+
+	// Description is optional by default; the schema governs whether it is
+	// required. We only enforce the length limit when it is present.
+	if val, present := parsed["description"]; present {
+		if s, ok := val.(string); ok && len([]rune(s)) > descriptionMaxLen {
+			diags = append(diags, Diagnostic{
+				Path: path, Line: line, Rule: "frontmatter",
+				Message: fmt.Sprintf("field %q: length %d above max %d", "description", len([]rune(s)), descriptionMaxLen),
+			})
+		}
+	}
+
 	return diags
 }
 

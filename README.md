@@ -4,7 +4,7 @@ the sanest linter in the world
 ## CONFIGURATION
 Put this in the folder from where you run `hugolint md` or `hugolint build`
 
-(Note: You don't have to specify title or description in your schemas, our linting requires *all* your pages to have those two fields.)
+(Note: You don't have to specify a title in your schemas, our linting requires *all* your pages have one)
 
 ```yaml
 paths:
@@ -21,6 +21,7 @@ spelling:
 # frontmatter schema for each section of your site
 sections:
   root:
+    description: { type: string, min: 1, max: 160, required: true }
     date: { type: date }
     type: { type: enum, values: [list, meta] }
     topics: { type: list, items: enum, values: [design, misc, personal, practical, software, websites] }
@@ -30,6 +31,7 @@ sections:
     aliases: { type: list }
 
   writing:
+    description: { type: string, min: 1, max: 160, required: true }
     date: { type: date, required: true }
     type: { type: enum, required: true, values: [essay, list, notebook] }
     topics: { type: list, required: true, items: enum, values: [design, misc, personal, practical, software, websites] }
@@ -81,6 +83,7 @@ index_pages:
 - [x] Warn on H1s (they should be in frontmatter title)
 - [x] Warn on any heading more than 4
 - [x] Too long link text, code formatting, bold, italic, etc.
+- [x] Word repetition like "the the"
 - [ ] URLs
   - [ ] Duplicate trailing slashes, double slashes in paths
   - [x] Catch mailto: addresses that aren’t valid email syntax
@@ -94,10 +97,14 @@ index_pages:
 
 ### AST-prose lints
 - [ ] Existence of ** \`~~
-- [ ] Spellcheck on prose with aspell with an personal dictionary
-- [ ] Suffix handling (2nd, 50kg vs 50 kg)
+- [x] Spellcheck on prose with aspell with an personal dictionary
+- [x] Suffix handling (2nd, 50kg vs 50 kg)
+- [x] Unbalanced parens and quotes
+- [ ] Nonsense
+  - word.Word (missing space after punctuation)
 
 ### Non-AST checks
+- [x] Discourage using smart/curvy quotes in content directly
 - [ ] URLs
   - [ ] (http
   - [ ] )http
@@ -114,10 +121,7 @@ index_pages:
   - [ ] ![alt(image.png)
   - [x] Reversed link syntax ()[]
 - [x] Discourage reference links
-- [x] Word repetition like "the the"
-- [x] Unbalanced parens and quotes
 - [x] Discourage Setext headings 
-- [x] Discourage using smart/curvy quotes in content directly
 - [x] Broken Markdown
   - [x] Headings must start at the beginning of the line
   - [x] Lack of space after # on a new line
@@ -144,7 +148,6 @@ index_pages:
   - " — floating/orphaned quote
   - : — spaced colon
   -  +- /  -+ — malformed plus-minus
-  - word.Word (missing space after punctuation)
   - word/ word or word /word (asymmetrical spacing around a forward slash)
   - " word " (padded spaces inside quotation marks)
   - 10 % (unnecessary space before a percent sign)
@@ -154,3 +157,5 @@ index_pages:
   - word- word or word -word (space around hypen)
   - -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
   - 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
+
+  - – 10 (unnecessary space between hypen (or en dash) and number)
