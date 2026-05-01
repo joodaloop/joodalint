@@ -15,11 +15,13 @@ func fmCtxWithSection(section string, schema map[string]config.FieldSpec) *Front
 
 func fmFile(path, src string) *FrontmatterFile {
 	raw, _, _, line0 := SplitFrontmatter([]byte(src))
+	parsed, err := ParseFrontmatterYAML(raw)
 	return &FrontmatterFile{
-		Path:   path,
-		Raw:    raw,
-		Parsed: ParseFrontmatterYAML(raw),
-		Line0:  line0,
+		Path:     path,
+		Raw:      raw,
+		Parsed:   parsed,
+		ParseErr: err,
+		Line0:    line0,
 	}
 }
 

@@ -51,6 +51,7 @@ index_pages:
 ### Frontmatter lint for anything that doesn't match the declared schema
 - [x] Always check for title and description
 - [x] Warn if fields found that aren't in the config schema
+- [x] Spellcheck text fields
 
 ### Build lints (`hugolint build`)
 - [x] Checks site build for orphan files (not linked to from anywhere)
@@ -76,18 +77,18 @@ index_pages:
     - `<q>`
     - `</q>`
     - `</q<`
-
+  
 ### With-markdown AST 
 - [x] Warn on H1s (they should be in frontmatter title)
 - [x] Warn on any heading more than 4
 - [x] Too long link text, code formatting, bold, italic, etc.
-- [x] URLs
+- [ ] URLs
+  - [ ] Duplicate trailing slashes, double slashes in paths
   - [x] Catch mailto: addresses that aren’t valid email syntax
   - [x] Don't allow http:// 
   - [x] Empty URLs or empty URL text/alt
   - [x] Don't allow relative links
   - [x] Catch non-URL-safe characters inside URL
-  - [ ] Duplicate trailing slashes, double slashes in paths
   - [x] Discourage protocol-relative link
   - [x] Discourage spacing [ text ] in URL text
   - [x] Discourage and punctuation [documentation.](https://example.com) in URL text 

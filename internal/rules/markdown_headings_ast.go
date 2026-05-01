@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"fmt"
+
 	"github.com/yuin/goldmark/ast"
 )
 
@@ -32,6 +34,12 @@ func (markdownHeadingsAST) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnost
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: f.NodeLine(h), Rule: "headings",
 				Message: "h1 headings are not allowed",
+			})
+		}
+		if h.Level > 4 {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: f.NodeLine(h), Rule: "headings",
+				Message: fmt.Sprintf("h%d heading too deep — restructure to use h4 or shallower", h.Level),
 			})
 		}
 		return ast.WalkContinue, nil

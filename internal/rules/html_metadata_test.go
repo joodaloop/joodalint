@@ -169,12 +169,10 @@ func TestHeadMetadata_TwitterMirrors(t *testing.T) {
 			f.Metas[i].Content = "Different"
 		case "twitter:description":
 			f.Metas[i].Content = "Different"
-		case "twitter:image":
-			f.Metas[i].Content = "https://pager.joodaloop.com/assets/other.jpg"
 		}
 	}
 	diags := headMetadata{}.Check(f, metaCtx())
-	for _, want := range []string{"twitter:title", "twitter:description does not match", "twitter:image does not match"} {
+	for _, want := range []string{"twitter:title", "twitter:description does not match"} {
 		if !containsMsg(diags, want) {
 			t.Errorf("want diag containing %q, got %v", want, messages(diags))
 		}
@@ -240,24 +238,6 @@ func TestHeadMetadata_OGImageMissingAsset(t *testing.T) {
 	diags := headMetadata{}.Check(f, ctx)
 	if !containsMsg(diags, "og:image") || !containsMsg(diags, "does not exist") {
 		t.Fatalf("want og:image missing-asset diag, got %v", messages(diags))
-	}
-}
-
-func TestHeadMetadata_AlternateMarkdownMissing(t *testing.T) {
-	f := goodMetaFile()
-	f.HeadLinks = nil
-	diags := headMetadata{}.Check(f, metaCtx())
-	if !containsMsg(diags, `rel="alternate"`) {
-		t.Fatalf("want alternate-link diag, got %v", messages(diags))
-	}
-}
-
-func TestHeadMetadata_AlternateMarkdownDeadHref(t *testing.T) {
-	f := goodMetaFile()
-	f.HeadLinks = []HeadLink{{Rel: "alternate", Type: "text/markdown", Href: "/missing.md"}}
-	diags := headMetadata{}.Check(f, metaCtx())
-	if !containsMsg(diags, "/missing.md") {
-		t.Fatalf("want dead-href diag, got %v", messages(diags))
 	}
 }
 

@@ -52,6 +52,25 @@ func TestHeadingsAST_FrontmatterLineOffset(t *testing.T) {
 	}
 }
 
+func TestHeadingsAST_DeepHeadingFlagged(t *testing.T) {
+	diags := markdownHeadingsAST{}.Check(mdFile("##### Too deep\nbody\n"), nil)
+	if !containsMsg(diags, "h5 heading too deep") {
+		t.Fatalf("want h5 too-deep diagnostic, got %v", messages(diags))
+	}
+}
+
+func TestHeadingsAST_H6Flagged(t *testing.T) {
+	diags := markdownHeadingsAST{}.Check(mdFile("###### Way too deep\n"), nil)
+	if !containsMsg(diags, "h6 heading too deep") {
+		t.Fatalf("want h6 too-deep diagnostic, got %v", messages(diags))
+	}
+}
+
+func TestHeadingsAST_H4Allowed(t *testing.T) {
+	diags := markdownHeadingsAST{}.Check(mdFile("#### Section\nbody\n"), nil)
+	assertNoDiags(t, diags)
+}
+
 func TestHeadingsAST_ID(t *testing.T) {
 	if (markdownHeadingsAST{}).ID() != "headings" {
 		t.Fatal("wrong ID")

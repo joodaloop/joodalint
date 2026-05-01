@@ -3,9 +3,12 @@ package rules
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -22,13 +25,15 @@ func init() {
 var spellingSuffixes = []string{"ish", "esque", "like", "y", "ness", "ery", "px"}
 
 type markdownSpelling struct {
-	once        sync.Once
-	dict        map[string]bool
-	suffixStrip *regexp.Regexp
-	aspellPath  string
-	initErr     error
-	enabled     bool
-	errOnce     sync.Once
+	once         sync.Once
+	hyphenSuffix *regexp.Regexp
+	ordinal      *regexp.Regexp
+	unitPrefix   *regexp.Regexp
+	aspellPath   string
+	personalPath string
+	initErr      error
+	enabled      bool
+	errOnce      sync.Once
 }
 
 func (*markdownSpelling) ID() string { return "spelling" }
@@ -50,11 +55,11 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 	}
 
 	body := f.Body
-	if m.suffixStrip != nil {
-		body = m.suffixStrip.ReplaceAll(body, []byte(""))
-	}
+	body = m.hyphenSuffix.ReplaceAll(body, []byte(""))
+	body = m.ordinal.ReplaceAll(body, []byte(""))
+	body = m.unitPrefix.ReplaceAll(body, []byte(""))
 
-	cmd := exec.Command(m.aspellPath, "--mode=markdown", "--lang=en", "list")
+	cmd := exec.Command(m.aspellPath, "--mode=markdown", "--lang=en", "--personal="+m.personalPath, "list")
 	cmd.Stdin = bytes.NewReader(body)
 	out, err := cmd.Output()
 	if err != nil {
@@ -65,7 +70,7 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		w := strings.TrimSpace(scanner.Text())
-		if w == "" || m.dict[w] {
+		if w == "" {
 			continue
 		}
 		unknown[w] = true
@@ -107,25 +112,51 @@ func (m *markdownSpelling) init(cfg *config.Config) {
 	}
 	m.aspellPath = path
 
-	m.dict = map[string]bool{}
-	if b, err := os.ReadFile(cfg.Spelling.Dict); err == nil {
-		s := bufio.NewScanner(bytes.NewReader(b))
-		for s.Scan() {
-			w := strings.TrimSpace(s.Text())
-			if w != "" {
-				m.dict[w] = true
-			}
-		}
-	} else {
+	b, err := os.ReadFile(cfg.Spelling.Dict)
+	if err != nil {
 		m.initErr = fmt.Errorf("spelling dict %q: %v", cfg.Spelling.Dict, err)
 		return
+	}
+	var words []string
+	s := bufio.NewScanner(bytes.NewReader(b))
+	for s.Scan() {
+		w := strings.TrimSpace(s.Text())
+		if w != "" {
+			words = append(words, w)
+		}
+	}
+
+	// Aspell's --personal expects its own format with a header line.
+	// Write a temp file aspell can consume; lets aspell handle morphology
+	// (plurals etc.) of custom words instead of exact-match filtering.
+	// Path is keyed off a hash of the contents so repeated runs reuse the
+	// same file and old hashes age out naturally with $TMPDIR.
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "personal_ws-1.1 en %d\n", len(words))
+	for _, w := range words {
+		fmt.Fprintln(&buf, w)
+	}
+	sum := sha256.Sum256(buf.Bytes())
+	m.personalPath = filepath.Join(os.TempDir(), "hugolint-aspell-"+hex.EncodeToString(sum[:8])+".pws")
+	if _, err := os.Stat(m.personalPath); err != nil {
+		if err := os.WriteFile(m.personalPath, buf.Bytes(), 0o644); err != nil {
+			m.initErr = fmt.Errorf("writing personal dict: %v", err)
+			return
+		}
 	}
 
 	quoted := make([]string, len(spellingSuffixes))
 	for i, s := range spellingSuffixes {
 		quoted[i] = regexp.QuoteMeta(s)
 	}
-	m.suffixStrip = regexp.MustCompile(`-(` + strings.Join(quoted, "|") + `)\b`)
+	m.hyphenSuffix = regexp.MustCompile(`-(` + strings.Join(quoted, "|") + `)\b`)
+
+	// Ordinals: 1st, 2nd, 3rd, 21st, 102nd... aspell flags these.
+	m.ordinal = regexp.MustCompile(`\b\d+(st|nd|rd|th)\b`)
+
+	// Unit-attached numbers: 50kg → kg (strip digits only, so a typo'd
+	// unit like "50kgg" still gets caught).
+	m.unitPrefix = regexp.MustCompile(`\b\d+(?=[a-zA-Z])`)
 
 	m.enabled = true
 }

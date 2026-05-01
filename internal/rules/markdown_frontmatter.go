@@ -34,13 +34,13 @@ func (markdownFrontmatter) Check(f *FrontmatterFile, ctx *FrontmatterContext) []
 		}}
 	}
 
-	var parsed map[string]any
-	if err := yaml.Unmarshal(f.Raw, &parsed); err != nil {
+	if f.ParseErr != nil {
 		return []Diagnostic{{
 			Path: f.Path, Line: fmLine, Rule: "frontmatter",
-			Message: fmt.Sprintf("invalid YAML: %v", err),
+			Message: fmt.Sprintf("invalid YAML: %v", f.ParseErr),
 		}}
 	}
+	parsed := f.Parsed
 
 	var diags []Diagnostic
 	diags = append(diags, checkTitleDescription(f.Path, fmLine, parsed, schema)...)
@@ -140,17 +140,16 @@ func SplitFrontmatter(content []byte) (fmRaw, body []byte, fmLines, fmStartLine 
 	return
 }
 
-// ParseFrontmatterYAML unmarshals raw frontmatter YAML into a map. Returns
-// nil if the YAML is empty or fails to parse.
-func ParseFrontmatterYAML(raw []byte) map[string]any {
+// ParseFrontmatterYAML unmarshals raw frontmatter YAML into a map.
+func ParseFrontmatterYAML(raw []byte) (map[string]any, error) {
 	if len(raw) == 0 {
-		return nil
+		return nil, nil
 	}
 	var parsed map[string]any
 	if err := yaml.Unmarshal(raw, &parsed); err != nil {
-		return nil
+		return nil, err
 	}
-	return parsed
+	return parsed, nil
 }
 
 func validate(name string, val any, spec config.FieldSpec) string {

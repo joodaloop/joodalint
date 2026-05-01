@@ -129,6 +129,7 @@ type FrontmatterFile struct {
 	Path   string
 	Raw    []byte
 	Parsed map[string]any
+	ParseErr error
 	Line0  int
 }
 

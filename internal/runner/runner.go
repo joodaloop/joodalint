@@ -50,11 +50,13 @@ func Markdown(cfg *config.Config) (int, error) {
 		}
 
 		fmRaw, body, fmLines, fmStartLine := rules.SplitFrontmatter(b)
+		fmParsed, fmParseErr := rules.ParseFrontmatterYAML(fmRaw)
 		ff := &rules.FrontmatterFile{
-			Path:   p,
-			Raw:    fmRaw,
-			Parsed: rules.ParseFrontmatterYAML(fmRaw),
-			Line0:  fmStartLine,
+			Path:     p,
+			Raw:      fmRaw,
+			Parsed:   fmParsed,
+			ParseErr: fmParseErr,
+			Line0:    fmStartLine,
 		}
 		mf := &rules.MarkdownFile{
 			Path:          p,

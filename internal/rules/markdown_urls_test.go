@@ -433,3 +433,19 @@ func TestURLs_LinkTrailingPunctuationFlagged(t *testing.T) {
 func TestURLs_LinkNoTrailingPunctuationOK(t *testing.T) {
 	assertNoDiags(t, markdownURLs{}.Check(mdFile("[documentation](https://example.com)\n"), nil))
 }
+
+func TestURLs_LongLinkText(t *testing.T) {
+	long := ""
+	for i := 0; i < 110; i++ {
+		long += "a"
+	}
+	src := "[" + long + "](https://example.com)\n"
+	diags := markdownURLs{}.Check(mdFile(src), nil)
+	if !containsMsg(diags, "keep link text concise") {
+		t.Fatalf("want long-link-text diag, got %v", messages(diags))
+	}
+}
+
+func TestURLs_ShortLinkTextOK(t *testing.T) {
+	assertNoDiags(t, markdownURLs{}.Check(mdFile("[short text](https://example.com)\n"), nil))
+}
