@@ -23,6 +23,17 @@ func TestProseHygiene_Cases(t *testing.T) {
 		{"two adjacent (paren) [bracket] groups with space\n", "reversed link syntax", false},
 		{"citation (see [1]) reference\n", "reversed link syntax", false},
 
+		// Reference link — discouraged, flag [text][ref] and [text][].
+		{"see [foo][bar] here\n", "Avoid using reference links", true},
+		{"see [foo][] here\n", "Avoid using reference links", true},
+		{"normal [text](https://example.com) inline link\n", "Avoid using reference links", false},
+		{"a [text][ref] followed by [ref]: url\n", "Avoid using reference links", true},
+
+		// Setext heading literal.
+		{"Title\n=====\n", "Setext headers", true},
+		{"not a === setext\n", "Setext headers", true},
+		{"just plain prose\n", "Setext headers", false},
+
 		// Bullet without space.
 		{"-foo\n", "list bullet without space", true},
 		{"+foo\n", "list bullet without space", true},

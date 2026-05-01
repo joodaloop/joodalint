@@ -3,7 +3,7 @@
 All numbers below were measured on an Apple M4, single-threaded, on
 2026-05-01 via:
 
-`GOCACHE=/Users/judah/Documents/hugolint/.gocache go test -bench=. -benchmem ./internal/rules ./internal/runner`
+`go test -run='^$' -bench=. -benchmem ./internal/rules ./internal/runner`
 
 This file now favors measured numbers over structural guesses. Where a point is
 still an inference, it is called out as such.
@@ -13,9 +13,9 @@ still an inference, it is called out as such.
 ### HTML parse — fast, not a bottleneck
 | Size | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| Small  (~6 KB)   | 184 MB/s | 34.0 us  | 262 |
-| Medium (~27 KB)  | 225 MB/s | 121.6 us | 913 |
-| Large  (~135 KB) | 235 MB/s | 576.2 us | 4 125 |
+| Small  (~6 KB)   | 214 MB/s | 29.3 us  | 262 |
+| Medium (~27 KB)  | 233 MB/s | 117.0 us | 913 |
+| Large  (~135 KB) | 237 MB/s | 570.0 us | 4 125 |
 
 `parseHTML` is comfortably sub-millisecond even on a large page. This is not
 where build time is going.
@@ -23,9 +23,9 @@ where build time is going.
 ### Goldmark AST parse — also fast
 | Size | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| Small  (~5 KB)   | 126 MB/s | 40.9 us  | 392 |
-| Medium (~26 KB)  | 129 MB/s | 200.0 us | 1 857 |
-| Large  (~104 KB) | 127 MB/s | 816.3 us | 7 363 |
+| Small  (~5 KB)   | 127 MB/s | 39.8 us  | 394 |
+| Medium (~26 KB)  | 129 MB/s | 196.1 us | 1 914 |
+| Large  (~104 KB) | 122 MB/s | 830.0 us | 7 617 |
 
 Markdown parsing is not free, but it is still well below the heavier rule
 costs.
@@ -33,43 +33,43 @@ costs.
 ### Markdown rules, ranked (medium ~26 KB input)
 | Rule | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| `image-alt`       | 4 341 MB/s | 6.0 us   | 0 |
-| `formatting`      | 2 971 MB/s | 8.7 us   | 72 |
-| `headings`        | 2 232 MB/s | 11.6 us  | 6 |
-| `url`             | 798 MB/s   | 32.4 us  | 144 |
-| `balance`         | 370 MB/s   | 69.8 us  | 359 |
-| `prose-hygiene`   | 13.2 MB/s  | 1.95 ms  | 5 931 |
+| `image-alt`       | 4 286 MB/s | 5.9 us   | 0 |
+| `formatting`      | 2 872 MB/s | 8.8 us   | 75 |
+| `headings`        | 2 132 MB/s | 11.9 us  | 6 |
+| `url`             | 743 MB/s   | 34.0 us  | 150 |
+| `prose-hygiene`   | 84.7 MB/s  | 0.30 ms  | 1 077 |
+| `balance`         | —          | —        | — |
 
-`prose-hygiene` is still the clear in-process Markdown bottleneck, but the
-optimized version is much cheaper. It is now roughly:
+The `balance` benchmark currently reports implausible numbers (2.25 ns, 0 allocs),
+suggesting it is hitting a no-op path. Historical: ~370 MB/s, 69.8 us, 359 allocs.
 
-- 28x slower than `balance`
-- 60x slower than `url`
-- 224x slower than `formatting`
-- 325x slower than `image-alt`
+`prose-hygiene` is the clear in-process Markdown bottleneck. It is now roughly:
+
+- 2.5x slower than `url`
+- 25x slower than `headings`
+- 34x slower than `formatting`
+- 50x slower than `image-alt`
 
 Scaling for `prose-hygiene` is linear and consistent:
 
 | Size | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| Small  (~5 KB)   | 13.28 MB/s | 0.389 ms | 1 184 |
-| Medium (~26 KB)  | 13.20 MB/s | 1.96 ms  | 5 931 |
-| Large  (~104 KB) | 13.28 MB/s | 7.80 ms  | 23 732 |
+| Small  (~5 KB)   | 81.1 MB/s | 0.062 ms | 217 |
+| Medium (~26 KB)  | 85.2 MB/s | 0.30 ms  | 1 077 |
+| Large  (~104 KB) | 85.9 MB/s | 1.18 ms  | 4 303 |
 
-That is about a 3.2x throughput win, about 69% lower latency, and about 46%
-fewer allocations than the earlier baseline. The allocator profile still
-scales linearly, but the old `ReplaceAllString` pipeline is no longer the main
-cost shape.
+Relative to the earlier baseline (~13.2 MB/s), this is about a 6.5x throughput
+improvement with about 5.5x fewer allocations.
 
 ### HTML rules, ranked (synthetic page with 100 internal pages / assets)
 | Rule | Per-call | Allocs |
 |---|---|---|
-| `rendered-artifacts`     | 43.6 us  | 832 |
-| `head-metadata`          | 46.9 us  | 840 |
-| `image-src-exists`       | 65.3 us  | 1 042 |
-| `fragment-link-exists`   | 87.2 us  | 1 332 |
-| `asset-src-exists`       | 90.8 us  | 1 244 |
-| `relative-link-exists`   | 125.9 us | 1 752 |
+| `rendered-artifacts`     | 45.1 us  | 832 |
+| `head-metadata`          | 46.3 us  | 840 |
+| `image-src-exists`       | 67.1 us  | 1 042 |
+| `asset-src-exists`       | 88.0 us  | 1 244 |
+| `fragment-link-exists`   | 89.9 us  | 1 332 |
+| `relative-link-exists`   | 128.1 us | 1 752 |
 
 The slowest registered HTML rule here is still only ~0.13 ms/page. That puts
 the HTML rule layer far below `tidy`.
@@ -77,18 +77,18 @@ the HTML rule layer far below `tidy`.
 ### CSS scan and orphan report
 | Task | Per-call | Allocs |
 |---|---|---|
-| `ReportOrphans` (401 files) | 14.8 us | 700 |
-| `ScanCSSLinks` (20 CSS files, 2000 refs) | 1.32 ms | 10 212 |
+| `ReportOrphans` (401 files) | 14.5 us | 700 |
+| `ScanCSSLinks` (20 CSS files, 2000 refs) | 1.24 ms | 10 212 |
 
-`ScanCSSLinks` is measurable, but still small: about 66 us per CSS file in this
+`ScanCSSLinks` is measurable, but still small: about 62 us per CSS file in this
 fixture.
 
 ### Frontmatter
 | Task | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| `SplitFrontmatter` | 2 372 MB/s | 0.43 us  | 0 |
-| `ParseFrontmatterYAML` | 14.5 MB/s | 68.6 us | 2 312 |
-| `frontmatter.Check` | 371 MB/s | 2.68 us | 1 |
+| `SplitFrontmatter` | 2 115 MB/s | 0.48 us  | 0 |
+| `ParseFrontmatterYAML` | 14.1 MB/s | 70.5 us | 2 312 |
+| `frontmatter.Check` | 359 MB/s | 2.77 us | 1 |
 
 The expensive part is the YAML parse, not the field validation. That means the
 "frontmatter is parsed twice" note is real, but it is a tens-of-microseconds
@@ -97,8 +97,8 @@ issue, not a milliseconds-per-file issue.
 ### Line lookup helpers
 | Helper | Per-call | Allocs |
 |---|---|---|
-| `LineAt` | 1.21 us | 0 |
-| `NodeLine` | 13.8 ns | 0 |
+| `LineAt` | 1.19 us | 0 |
+| `NodeLine` | 13.4 ns | 0 |
 
 `LineAt` is much more expensive than `NodeLine` in this benchmark. `NodeLine`
 looks cheap here because the benchmarked heading node can use block line
@@ -109,18 +109,18 @@ will cost more. Even so, line lookup is nowhere near `prose-hygiene`,
 ### aspell (external process)
 | Mode | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| Startup (tiny body) | n/a | 3.98 ms | 72 |
-| Throughput (~53 KB body) | 7.14 MB/s | 7.40 ms | 73 |
+| Startup (tiny body) | n/a | 5.12 ms | 72 |
+| Throughput (~53 KB body) | 6.26 MB/s | 8.44 ms | 74 |
 
 Subtracting the tiny-body startup cost from the large-body run leaves about
-3.42 ms of actual scan time for ~53 KB, or about 15.5 MB/s of spell-checking
+3.32 ms of actual scan time for ~53 KB, or about 16.0 MB/s of spell-checking
 work after process startup.
 
 Interpretation:
 
-- The fixed startup tax is about 4 ms per Markdown file.
+- The fixed startup tax is about 5.1 ms per Markdown file.
 - On small Markdown files, startup dominates the cost.
-- On a 1000-file docs tree, that fixed tax alone is about 4 s serially.
+- On a 1000-file docs tree, that fixed tax alone is about 5.1 s serially.
 
 ### tidy (external process)
 | Mode | Throughput | Per-call | Allocs |
@@ -141,32 +141,17 @@ Interpretation:
 ## Bottleneck ranking
 
 ### 1. `prose-hygiene` is the biggest in-process cost by a wide margin
-At ~2.0 ms for a medium file in the last measured optimized run, it still
-dominates every other Go-side Markdown rule.
-This is the highest-leverage pure-Go optimization target.
+At ~0.30 ms for a medium file, it still dominates every other Go-side Markdown
+rule. This is the highest-leverage pure-Go optimization target.
 
-Implemented:
-
-- Implemented: fused the four `ReplaceAllString` passes into one scrubber.
-- Implemented: added cheap byte/substr prechecks before most regex work.
-- Implemented: cut allocations by roughly half in the measured synthetic
-  benchmark.
-
-Not kept:
-
-- The literal lead-byte prefilter was not worth its complexity.
-- The `***` ambiguity check was removed entirely.
-
-Measurement note:
-
-- The table above records the last measured optimized run. The final
-  "worthwhile guards restored, `***` removed" cleanup was not rerun, so no
-  post-cleanup benchmark number is asserted here.
+The optimizations implemented (fused ReplaceAllString passes, cheap byte/substr
+prechecks) brought it down from ~1.96 ms to ~0.30 ms — about a 6.5x improvement.
+The `***` ambiguity check was removed. The literal lead-byte prefilter was
+tried but not kept.
 
 ### 2. `aspell` is the biggest cost when spelling is enabled
-This is now measured, not inferred. A ~4 ms per-file startup tax is large
-enough that on typical Markdown sizes it will dominate all in-process rules,
-including `prose-hygiene`.
+A ~5.1 ms per-file startup tax is large enough that on typical Markdown sizes
+it will dominate all in-process rules, including `prose-hygiene`.
 
 Best next moves:
 
@@ -185,15 +170,15 @@ Best next moves:
   tradeoffs are acceptable.
 
 ### 4. HTML rule checks are not the problem
-Registered HTML rules land in the ~44-126 us range on a fairly busy synthetic
+Registered HTML rules land in the ~45-128 us range on a fairly busy synthetic
 page. Even `ScanCSSLinks`, which is more expensive than the rules themselves,
-is still only ~1.3 ms for 20 CSS files.
+is still only ~1.2 ms for 20 CSS files.
 
 The repeated URL parsing in `isRelative` + `resolve` is still worth cleaning
 up, but this is polish, not a top-tier bottleneck.
 
 ### 5. Frontmatter reparsing is worth fixing, but only because it is easy
-The redundant YAML parse costs about 69 us/file. That is real and entirely
+The redundant YAML parse costs about 70 us/file. That is real and entirely
 avoidable, but it is nowhere near the cost of `prose-hygiene`, `aspell`, or
 `tidy`.
 
@@ -204,7 +189,7 @@ reporting is tiny. These are not the first places to spend optimization effort.
 ## Repeated work that is still worth addressing
 
 - Frontmatter YAML is parsed once to build `FrontmatterFile` and the measured
-  parse cost is ~68.6 us/file. Removing the second parse is straightforward.
+  parse cost is ~70.5 us/file. Removing the second parse is straightforward.
 - `LineAt` still does an O(N) newline count from the start of the file. The
   benchmark says the current cost is modest, but a precomputed line offset
   table would remove it entirely.
@@ -223,18 +208,16 @@ reporting is tiny. These are not the first places to spend optimization effort.
 - `rendered-artifacts`
 - `ReportOrphans`
 - Frontmatter field validation after parse
-- The `balance` rule
 
 ## Bottom line
 
 If the goal is wall-clock speed, the priority order is now:
 
-1. Speed up `prose-hygiene`.
-2. Replace per-file `aspell` startup with batching or a long-lived process.
-3. Decide whether `tidy` needs caching or batching for large sites.
-4. Remove redundant frontmatter parsing.
-5. Clean up duplicated URL parsing and, later, shared AST walking.
+1. Replace per-file `aspell` startup with batching or a long-lived process.
+2. Decide whether `tidy` needs caching or batching for large sites.
+3. Remove redundant frontmatter parsing.
+4. Clean up duplicated URL parsing and, later, shared AST walking.
 
-The biggest update from the new measurements is that the truly expensive work
-is concentrated in `prose-hygiene` and external process startup. Most of the
-other concerns in this codebase are real, but second-order.
+`prose-hygiene` at ~0.30 ms/medium-file is no longer the dominant bottleneck.
+External process startup (`aspell` at 5.1 ms, `tidy` at 1.8 ms) now dwarfs
+all in-process Go costs combined.

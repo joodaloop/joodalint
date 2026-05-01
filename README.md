@@ -158,3 +158,32 @@ index_pages:
   - 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
 
   - – 10 (unnecessary space between hypen (or en dash) and number)
+
+
+(  — space after opening paren
+. — space around period
+ ! — space before exclamation mark
+ ? — space before question mark
+__ underscore emphasis detection
+</q< in rendered text
+<— / —> in rendered text
+" ]( quote glued to link
+Generic/useless image alt text (image-alt rule)
+Punctuation at end of link text (link-punctuation rule)
+Extra spaces inside link text (spaces-around-link rule)
+/* / */ — stray code-comment markers in rendered text
+Currency check covers $ £ € ¥ (README only mentions $ 100)
+
+
+
+### MISSING
+.. (double period)	Line 142 — under "Doubled / malformed punctuation"	Not in any literal pattern or regex in the code
+– 10 (space between hyphen/en-dash and number)	Line 160	No check exists for this pattern
+-10 (hyphen vs −10 minus sign)	Line 157 — listed under "Non-AST checks"	Only in AST-path (markdown_prose_ast.go:212, proseBlockChecks), not in the line-by-line non-AST scanner
+100-200 (hyphen vs en dash – for ranges)	Line 158 — listed under "Non-AST checks"	Only in AST-path (markdown_prose_ast.go:215, proseBlockChecks), not in the line-by-line non-AST scanner
+
+
+(http	[ ] under Non-AST URLs	html_artifacts.go:22 (build lint — detects leaked text in rendered HTML)
+)http	[ ] under Non-AST URLs	html_artifacts.go:23
+[http	[ ] under Non-AST URLs	html_artifacts.go:24
+]http	[ ] under Non-A	html_artifacts.go:25

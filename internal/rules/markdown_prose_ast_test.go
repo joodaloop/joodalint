@@ -110,6 +110,18 @@ func TestProseHygieneAST_Cases(t *testing.T) {
 		{"well-known method\n", "asymmetrical spacing around hyphen", false},
 		{"well - known method\n", "asymmetrical spacing around hyphen", false},
 		{"re-enter the room\n", "asymmetrical spacing around hyphen", false},
+		{"high quality\n", "asymmetrical spacing around hyphen", false},
+
+		// Smart quotes in plain prose — should be flagged.
+		{"hello \u201cworld\u201d here\n", "opening smart quote", true},
+		{"hello \u201cworld\u201d here\n", "closing smart quote", true},
+
+		// Smart quote inside link text (included in ProseBlocks) — flagged.
+		{"see [\u201cfoo\u201d](https://example.com) link\n", "opening smart quote", true},
+
+		// Smart quote inside code span (skipped by FlattenProse) — not flagged.
+		{"see `\u201cfoo\u201d` here\n", "opening smart quote", false},
+		{"see `\u201cfoo\u201d` here\n", "closing smart quote", false},
 
 		// Hyphen as minus / range. Link URLs must not contribute.
 		{"temperature is -10 today\n", "hyphen used as minus", true},
