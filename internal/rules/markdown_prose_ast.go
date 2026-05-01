@@ -29,6 +29,7 @@ type astLiteralPattern struct {
 
 var astLiteralPatterns = []astLiteralPattern{
 	{"——", "double em dash"},
+	{"---", "literal triple hyphen (use em dash —)"},
 	{"''", "double apostrophe"},
 	{"``", "double backtick"},
 	{"“", "opening smart quote"},
@@ -41,6 +42,7 @@ var astLiteralPatterns = []astLiteralPattern{
 	{" ?", "space before question mark"},
 	{"**", "unescaped bold markers (**)"},
 	{"~~", "unescaped strikethrough markers"},
+	{"==", "unescaped highlight markers (==)"},
 	{"__", "unescaped emphasis markers (__)"},
 }
 

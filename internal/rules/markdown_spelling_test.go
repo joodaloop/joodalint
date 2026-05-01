@@ -95,6 +95,20 @@ func TestBodySpelling_FrontmatterSkipped(t *testing.T) {
 	}
 }
 
+func TestBodySpelling_UnknownWordAfterManySpans(t *testing.T) {
+	resetSpeller()
+	cfg := bodySpellingCfg(t)
+	ctx := &MarkdownContext{Config: cfg}
+	src := "First paragraph with ordinary words.\n\n" +
+		"## Heading\n\n" +
+		"Second paragraph, also ordinary, spread across **bold** and *italic* spans.\n\n" +
+		"Third paragraph contains the typo asdfqwer near the end.\n"
+	diags := (&markdownSpelling{}).Check(mdFile(src), ctx)
+	if !containsMsg(diags, `unknown word: "asdfqwer"`) {
+		t.Errorf("want asdfqwer diag from late-in-file span, got %v", messages(diags))
+	}
+}
+
 func TestBodySpelling_ID(t *testing.T) {
 	if (&markdownSpelling{}).ID() != "spelling" {
 		t.Fatal("wrong ID")

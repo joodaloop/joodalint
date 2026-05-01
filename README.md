@@ -96,7 +96,7 @@ index_pages:
   - [x] Discourage and punctuation [documentation.](https://example.com) in URL text 
 
 ### AST-prose lints
-- [x] Existence of ** \`~~
+- [x] Existence of ** \`~~ ==
 - [x] Spellcheck on prose with aspell with an personal dictionary
 - [x] Suffix handling (2nd, 50kg vs 50 kg)
 - [x] Unbalanced parens and quotes

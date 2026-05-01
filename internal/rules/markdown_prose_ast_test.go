@@ -47,11 +47,13 @@ func TestProseHygieneAST_Cases(t *testing.T) {
 		{"what? That\n", "space before question mark", false},
 		{"lingering ** here\n", "unescaped bold markers", true},
 		{"lingering ~~ here\n", "unescaped strikethrough markers", true},
+		{"lingering == here\n", "unescaped highlight markers", true},
 		{"lingering __ here\n", "unescaped emphasis markers", true},
 
 		// Unescaped markers inside code spans — not flagged.
 		{"code `**foo**` here\n", "unescaped bold markers", false},
 		{"code `~~foo~~` here\n", "unescaped strikethrough markers", false},
+		{"code `==foo==` here\n", "unescaped highlight markers", false},
 		{"code `__foo__` here\n", "unescaped emphasis markers", false},
 
 		// Spaced colon, plus-minus.

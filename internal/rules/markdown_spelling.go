@@ -32,15 +32,16 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 		return nil
 	}
 
-	// Build a single buffer of post-parse prose, NUL-separated so words
-	// can't merge across span boundaries.
+	// Build a single buffer of post-parse prose. Spans are separated by
+	// blank lines so words can't merge across boundaries; aspell stops
+	// reading at NUL on stdin, so we must avoid that byte.
 	var buf bytes.Buffer
 	for _, blk := range f.ProseBlocks {
 		for _, sp := range blk.Spans {
 			buf.Write(sp.Text)
-			buf.WriteByte(0)
+			buf.WriteString("\n\n")
 		}
-		buf.WriteByte(0)
+		buf.WriteString("\n\n")
 	}
 	if buf.Len() == 0 {
 		return nil

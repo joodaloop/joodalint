@@ -25,7 +25,6 @@ var (
 	wordSplit       = regexp.MustCompile(`[A-Za-z]+`)
 	spacedColon     = regexp.MustCompile(` : `)
 	plusMinus       = regexp.MustCompile(` \+-|\s-\+`)
-	hrLine          = regexp.MustCompile(`^\s*-{3,}\s*$`)
 	fenceLine       = regexp.MustCompile("^\\s*(```|~~~)")
 	underscoreEmph  = regexp.MustCompile(`\s_{1,2}[^\s_][^_\n]*?_{1,2}(\s|[.,;:!?)\]]|$)`)
 	reversedLink    = regexp.MustCompile(`\([^)\n]*\)\[[^\]\n]*\]`)
@@ -80,7 +79,6 @@ type literalPattern struct {
 // marker. Content-level needles (e.g. " ,", "——") live in
 // markdown_prose_ast.go and run against ProseBlock spans.
 var literalPatterns = []literalPattern{
-	{"---", "literal triple hyphen (use em dash —)"},
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
 	{`===`, "Setext headers, brittle"},
@@ -156,15 +154,6 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 					Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
 				})
 			}
-		}
-
-		// HR lines look like a literal `---`. Drop the false positive
-		// emitted just above by the literalPatterns loop.
-		if hrLine.MatchString(text) {
-			if n := len(diags); n > 0 && strings.Contains(diags[n-1].Message, `"---"`) {
-				diags = diags[:n-1]
-			}
-			continue
 		}
 
 		// Hugo shortcode spacing — keep line-based; applies uniformly.
