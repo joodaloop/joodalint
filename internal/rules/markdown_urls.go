@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	urlpkg "net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -186,12 +187,16 @@ func validateLinkURL(path string, line int, raw string, siteHosts map[string]boo
 			Message: fmt.Sprintf("unparseable URL: %s", raw),
 		}}
 	}
-	// No scheme — a plain relative path. Hugo content should use root-relative URLs.
+	// No scheme — a plain relative path. Hugo page bundles (index.md / _index.md)
+	// idiomatically use sibling references for resources like images.
 	if u.Scheme == "" {
-		return []Diagnostic{{
-			Path: path, Line: line, Rule: "relative-link",
-			Message: fmt.Sprintf("relative link: %s (use root-relative path starting with /)", raw),
-		}}
+		if !isBundleIndex(path) {
+			return []Diagnostic{{
+				Path: path, Line: line, Rule: "relative-link",
+				Message: fmt.Sprintf("relative link: %s (use root-relative path starting with /)", raw),
+			}}
+		}
+		return nil
 	}
 	if skipSchemes[u.Scheme] {
 		return nil
@@ -354,6 +359,11 @@ func configuredSiteHosts(ctx *MarkdownContext) map[string]bool {
 		}
 	}
 	return hosts
+}
+
+func isBundleIndex(path string) bool {
+	name := filepath.Base(path)
+	return name == "index.md" || name == "_index.md"
 }
 
 func rootRelativeURL(u *urlpkg.URL) string {

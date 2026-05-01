@@ -170,7 +170,7 @@ func TestFrontmatter_DescriptionTooLong(t *testing.T) {
 	cfg := &config.Config{Paths: config.Paths{MarkdownRoot: "content"}}
 	ctx := &FrontmatterContext{Config: cfg}
 	long := ""
-	for i := 0; i < 161; i++ {
+	for i := 0; i < 321; i++ {
 		long += "a"
 	}
 	src := "---\ntitle: hi\ndescription: " + long + "\n---\nbody\n"

@@ -79,7 +79,7 @@ func (markdownFrontmatter) Check(f *FrontmatterFile, ctx *FrontmatterContext) []
 	return diags
 }
 
-const descriptionMaxLen = 160
+const descriptionMaxLen = 320
 
 func checkTitleDescription(path string, line int, parsed map[string]any, schema map[string]config.FieldSpec) []Diagnostic {
 	var diags []Diagnostic

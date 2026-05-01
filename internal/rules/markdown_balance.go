@@ -35,9 +35,12 @@ func (markdownBalance) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 				switch c {
 				case '(', '[', '{':
 					stack = append(stack, openDelim{ch: c, offset: sp.Offset + i})
-				case ')', ']', '}':
-					want := matchOpener(c)
-					if len(stack) == 0 {
+			case ')', ']', '}':
+				want := matchOpener(c)
+				if len(stack) == 0 {
+					if c == ')' && (isNumberedListClose(text, i) || isEmoticonClose(text, i)) {
+						continue
+					}
 						diags = append(diags, Diagnostic{
 							Path: f.Path, Line: f.LineAt(sp.Offset + i), Rule: "balance",
 							Message: fmt.Sprintf("unmatched closing %q", c),
@@ -64,6 +67,28 @@ func (markdownBalance) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 		}
 	}
 	return diags
+}
+
+func isNumberedListClose(text []byte, i int) bool {
+	if i == 0 {
+		return false
+	}
+	digitCount := 0
+	for j := i - 1; j >= 0; j-- {
+		if text[j] >= '0' && text[j] <= '9' {
+			digitCount++
+			continue
+		}
+		if text[j] == ' ' || text[j] == '\t' {
+			return digitCount > 0
+		}
+		return false
+	}
+	return digitCount > 0
+}
+
+func isEmoticonClose(text []byte, i int) bool {
+	return i > 0 && (text[i-1] == ':' || text[i-1] == ';')
 }
 
 func matchOpener(closer byte) byte {

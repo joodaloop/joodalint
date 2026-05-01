@@ -88,6 +88,27 @@ func TestBalance_CodeSpanIgnored(t *testing.T) {
 	assertNoDiags(t, diags)
 }
 
+func TestBalance_NumberedListClose(t *testing.T) {
+	src := "Step 1) do this\n"
+	assertNoDiags(t, markdownBalance{}.Check(mdFile(src), nil))
+}
+
+func TestBalance_NumberedListClose_StillFlagsRealParen(t *testing.T) {
+	src := "Step 1) do (this\n"
+	diags := markdownBalance{}.Check(mdFile(src), nil)
+	if !containsMsg(diags, `unclosed '('`) {
+		t.Fatalf("want unclosed '(' for real paren, got %v", messages(diags))
+	}
+	if len(diags) != 1 {
+		t.Fatalf("want exactly 1 diag, got %v", messages(diags))
+	}
+}
+
+func TestBalance_MultiDigitNumbering(t *testing.T) {
+	src := "Step 10) do this\n"
+	assertNoDiags(t, markdownBalance{}.Check(mdFile(src), nil))
+}
+
 func TestBalance_ID(t *testing.T) {
 	if (markdownBalance{}).ID() != "balance" {
 		t.Fatal("wrong ID")

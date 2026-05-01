@@ -52,6 +52,7 @@ index_pages:
 
 ### Frontmatter lint for anything that doesn't match the declared schema
 - [x] Always check for title and description
+  - [ ] Description recommended to be under (Telegram: 340, Whatsapp: 230, Google: 160)
 - [x] Warn if fields found that aren't in the config schema
 - [x] Spellcheck text fields
 

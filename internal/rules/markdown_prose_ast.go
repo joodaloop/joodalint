@@ -40,7 +40,7 @@ var astLiteralPatterns = []astLiteralPattern{
 	{" . ", "space around period"},
 	{" ?", "space before question mark"},
 	{"**", "unescaped bold markers (**)"},
-	{"~~", "unescaped strikethrough markers (~~)"},
+	{"~~", "unescaped strikethrough markers"},
 	{"__", "unescaped emphasis markers (__)"},
 }
 
@@ -170,7 +170,7 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 		if !strings.ContainsAny(gap, " \t") {
 			continue
 		}
-		if strings.ContainsAny(gap, ".!?,;:&([])") {
+		if strings.ContainsAny(gap, ".!?,;:&(\"[])") {
 			continue
 		}
 		a := strings.ToLower(masked[idx[i-1][0]:idx[i-1][1]])
