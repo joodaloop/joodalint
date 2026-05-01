@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/html"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/joodaloop/hugolint/internal/config"
@@ -37,7 +38,7 @@ func Markdown(cfg *config.Config) (int, error) {
 
 	mdCtx := &rules.MarkdownContext{Config: cfg}
 	fmCtx := &rules.FrontmatterContext{Config: cfg}
-	mdParser := goldmark.New().Parser()
+	mdParser := goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 	legacy := rules.Markdown()
 	fmRules := rules.Frontmatter()
 	astRules := rules.MarkdownAST()
@@ -83,7 +84,7 @@ func Markdown(cfg *config.Config) (int, error) {
 		return out
 	})
 
-	report(diags)
+	report(diags, root)
 	return len(diags), nil
 }
 
@@ -114,7 +115,7 @@ func Build(cfg *config.Config, root string) (int, error) {
 	}
 	diags = append(diags, tidyDiags...)
 
-	report(diags)
+	report(diags, root)
 	return len(diags), nil
 }
 
@@ -421,7 +422,15 @@ func runFiles[T any](items []T, fn func(T) []rules.Diagnostic) []rules.Diagnosti
 	return all
 }
 
-func report(diags []rules.Diagnostic) {
+func report(diags []rules.Diagnostic, root string) {
+	prefix := strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
+	for i := range diags {
+		if rel, err := filepath.Rel(root, diags[i].Path); err == nil && !strings.HasPrefix(rel, "..") {
+			diags[i].Path = rel
+		} else {
+			diags[i].Path = strings.TrimPrefix(diags[i].Path, prefix)
+		}
+	}
 	sort.Slice(diags, func(i, j int) bool {
 		if diags[i].Rule != diags[j].Rule {
 			return diags[i].Rule < diags[j].Rule

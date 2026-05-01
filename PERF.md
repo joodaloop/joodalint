@@ -61,16 +61,14 @@ fast (sub-200 us even on large files), so the bulk of the ~2.6 ms AST-side
 | `formatting`      | 2 872 MB/s | 8.8 us   | 75 |
 | `headings`        | 2 132 MB/s | 11.9 us  | 6 |
 | `url`             | 743 MB/s   | 34.0 us  | 150 |
-| `prose-hygiene`   | 84.7 MB/s  | 0.30 ms  | 1 077 |
+| `prose-hygiene` (line-by-line) | 84.7 MB/s | 0.30 ms | 1 077 |
 | `balance`         | 859 MB/s   | 29.4 us  | 0 |
+| `prose-hygiene` (AST-based) | 9.78 MB/s | **2.59 ms** | 6 383 |
 
-`prose-hygiene` is the clear in-process Markdown bottleneck. It is now roughly:
-
-- 9.6x slower than `balance`
-- 8.3x slower than `url`
-- 24x slower than `headings`
-- 32x slower than `formatting`
-- 47x slower than `image-alt`
+Both `prose-hygiene` halves share the same rule ID and both execute per file,
+so the effective combined cost is ~2.87 ms — still the #1 in-process bottleneck
+by a factor of ~9x over the next-heaviest rule. The AST-based half is the
+expensive one.
 
 Scaling for `prose-hygiene` is linear and consistent:
 

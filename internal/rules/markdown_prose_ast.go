@@ -38,7 +38,6 @@ var astLiteralPatterns = []astLiteralPattern{
 	{"( ", "space after opening paren"},
 	{" ,", "space before comma"},
 	{" . ", "space around period"},
-	{" !", "space before exclamation mark"},
 	{" ?", "space before question mark"},
 	{"**", "unescaped bold markers (**)"},
 	{"~~", "unescaped strikethrough markers (~~)"},
@@ -214,6 +213,9 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 	}
 	if loc := hyphenRange.FindStringIndex(masked); loc != nil {
 		emit(loc[0], "hyphen in numeric range (use en dash –)")
+	}
+	if strings.Contains(masked, " !") {
+		emit(strings.Index(masked, " !"), "space before exclamation mark")
 	}
 	return diags
 }

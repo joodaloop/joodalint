@@ -39,10 +39,10 @@ func TestProseHygieneAST_Cases(t *testing.T) {
 		{"no comma here\n", "space before comma", false},
 		{"word . Next\n", "space around period", true},
 		{"word. Next\n", "space around period", false},
-		// Known limitation: goldmark's typographer extension splits text at
-		// '!' boundaries (but not '?' or '.'), so "space before !" cannot be
-		// detected across span boundaries. This is a goldmark parser issue.
-		{"yikes ! Run\n", "space before exclamation mark", false},
+		// The '!' check runs at block level (proseBlockChecks) because goldmark
+		// splits text at '!' trigger-char boundaries in its inline parser.
+		{"yikes ! Run\n", "space before exclamation mark", true},
+		{"no exclamation here\n", "space before exclamation mark", false},
 		{"what ? That\n", "space before question mark", true},
 		{"what? That\n", "space before question mark", false},
 		{"lingering ** here\n", "unescaped bold markers", true},

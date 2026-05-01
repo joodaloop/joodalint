@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -12,7 +13,7 @@ import (
 // prose-hygiene benchmark.
 func benchMarkdownFile(lines int) *MarkdownFile {
 	body := synthMarkdown(lines)
-	parser := goldmark.New().Parser()
+	parser := goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 	astRoot := parser.Parse(text.NewReader(body))
 	return &MarkdownFile{
 		Path:          "bench.md",
@@ -37,7 +38,7 @@ func BenchmarkGoldmarkParse(b *testing.B) {
 		{"Large", 2000},
 	} {
 		body := synthMarkdown(sz.lines)
-		parser := goldmark.New().Parser()
+		parser := goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 		b.Run(sz.name, func(b *testing.B) {
 			b.SetBytes(int64(len(body)))
 			b.ResetTimer()

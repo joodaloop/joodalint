@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -84,7 +85,7 @@ func BenchmarkFlattenProse(b *testing.B) {
 		{"Large", 2000},
 	} {
 		body := synthMarkdown(sz.lines)
-		parser := goldmark.New().Parser()
+		parser := goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 		root := parser.Parse(text.NewReader(body))
 		b.Run(sz.name, func(b *testing.B) {
 			b.SetBytes(int64(len(body)))

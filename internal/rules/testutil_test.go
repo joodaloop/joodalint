@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/text"
 )
 
-var testParser = goldmark.New().Parser()
+var testParser = goldmark.New(goldmark.WithExtensions(extension.Strikethrough)).Parser()
 
 // mdFile builds a MarkdownFile with the given content for testing,
 // populated the same way the runner populates real files.
