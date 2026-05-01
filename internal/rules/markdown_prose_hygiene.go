@@ -28,6 +28,7 @@ var (
 	fenceLine       = regexp.MustCompile("^\\s*(```|~~~)")
 	underscoreEmph  = regexp.MustCompile(`\s_{1,2}[^\s_][^_\n]*?_{1,2}(\s|[.,;:!?)\]]|$)`)
 	reversedLink    = regexp.MustCompile(`\([^)\n]*\)\[[^\]\n]*\]`)
+	referenceLink   = regexp.MustCompile(`\[[^)\n]*\]\[[^\]\n]*\]`)
 	bulletNoSpace   = regexp.MustCompile(`^ {0,3}[-+*][A-Za-z0-9]`)
 	emphasisLine    = regexp.MustCompile(`^ {0,3}\*[^*\s][^*]*\*`)
 	blockquoteNoSp  = regexp.MustCompile(`^ {0,3}>[^\s>]`)
@@ -42,6 +43,17 @@ var (
 	floatingQuote   = regexp.MustCompile(`(^|\s)"(\s|$)`)
 	shortcodeOpen   = regexp.MustCompile(`\{\{[<%][^\s<%}]`)
 	shortcodeClose  = regexp.MustCompile(`[^\s<%{][>%]\}\}`)
+
+	missingSpacePunct = regexp.MustCompile(`[a-z][.!?;,][A-Z][a-z]`)
+	asymSlash         = regexp.MustCompile(`[A-Za-z]/ [A-Za-z]|[A-Za-z] /[A-Za-z]`)
+	paddedQuote       = regexp.MustCompile(`"[ \t]+[^"\n]*?[ \t]+"`)
+	spacedPercent     = regexp.MustCompile(`\d %`)
+	spacedCurrency    = regexp.MustCompile(`[$£€¥] \d`)
+	spacedHash        = regexp.MustCompile(`[^#]# \d`)
+	straightPrimes    = regexp.MustCompile(`\d'\d+"`)
+	asymHyphen        = regexp.MustCompile(`[A-Za-z]- [A-Za-z]|[A-Za-z] -[A-Za-z]`)
+	hyphenMinus       = regexp.MustCompile(`(?:^|\s)-\d+(?:\s|$|[.,;:!?])`)
+	hyphenRange       = regexp.MustCompile(`(?:^|[^-\d.])\d+-\d+(?:[^-\d.]|$)`)
 )
 
 var invisibleChars = map[rune]string{
@@ -66,6 +78,10 @@ var literalPatterns = []literalPattern{
 	{"---", "literal triple hyphen (use em dash —)"},
 	{"''", "double apostrophe"},
 	{"``", "double backtick"},
+	{"“", "opening smart quote"},
+	{"”", "closing smart quote"},
+	{"‘", "opening curvy apostrophe"},
+	{"’", "closing curvy apostrophe"},
 	{",,", "double comma"},
 	{".. ", "double period"},
 	{" )", "space before closing paren"},
@@ -77,6 +93,7 @@ var literalPatterns = []literalPattern{
 	{" ?", "space before question mark"},
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
+	{`===`, "Setext headers, brittle"},
 }
 
 func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
@@ -217,6 +234,12 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 				Message: "reversed link syntax (use [text](url))",
 			})
 		}
+		if referenceLink.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "Avoid using reference links (use [text](url))",
+			})
+		}
 		if bulletNoSpace.MatchString(text) && !emphasisLine.MatchString(text) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
@@ -263,6 +286,66 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "odd indentation before list marker",
+			})
+		}
+		if missingSpacePunct.MatchString(prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "missing space after punctuation",
+			})
+		}
+		if asymSlash.MatchString(prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "asymmetrical spacing around /",
+			})
+		}
+		if paddedQuote.MatchString(prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: `padded spaces inside quotation marks (" word ")`,
+			})
+		}
+		if spacedPercent.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "space before percent sign (10 %)",
+			})
+		}
+		if spacedCurrency.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "space between currency symbol and number ($ 100)",
+			})
+		}
+		if spacedHash.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "space after # before number (# 1, prefer #1)",
+			})
+		}
+		if straightPrimes.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "straight quotes for feet/inches (use ′ ″)",
+			})
+		}
+		if asymHyphen.MatchString(prose) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "asymmetrical spacing around hyphen",
+			})
+		}
+		if hyphenMinus.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "hyphen used as minus sign (use −)",
+			})
+		}
+		if hyphenRange.MatchString(text) {
+			diags = append(diags, Diagnostic{
+				Path: f.Path, Line: line, Rule: "prose-hygiene",
+				Message: "hyphen in numeric range (use en dash –)",
 			})
 		}
 		for _, m := range tripleStarOpen.FindAllStringIndex(text, -1) {

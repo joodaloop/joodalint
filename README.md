@@ -3,6 +3,9 @@ the sanest linter in the world
 
 ## CONFIGURATION
 Put this in the folder from where you run `hugolint md` or `hugolint build`
+
+(Note: You don't have to specify title or description in your schemas, our linting requires *all* your pages to have those two fields.)
+
 ```yaml
 paths:
   markdown_root: content # folder containing your content .md files
@@ -18,44 +21,36 @@ spelling:
 # frontmatter schema for each section of your site
 sections:
   root:
-    title: { type: string, required: true }
     date: { type: date }
     type: { type: enum, values: [list, meta] }
     topics: { type: list, items: enum, values: [design, misc, personal, practical, software, websites] }
-    description: { type: string, min: 1, max: 160 }
     lastmod: { type: date }
     layout: { type: enum, values: [workbench, "~"] }
     popular: { type: bool }
     aliases: { type: list }
 
   writing:
-    title: { type: string, required: true }
     date: { type: date, required: true }
     type: { type: enum, required: true, values: [essay, list, notebook] }
     topics: { type: list, required: true, items: enum, values: [design, misc, personal, practical, software, websites] }
-    description: { type: string, min: 24, max: 160 }
     lastmod: { type: date }
     last_update: { type: date }
     popular: { type: bool }
 
   riffs:
-    title: { type: string, required: true }
     date: { type: date, required: true }
 
 # frontmatter schema for the _index.md pages in each section
 index_pages:
   root:
-    title: { type: string, required: true }
     type: { type: enum, values: [list] }
-  writing:
-    title: { type: string, required: true }
-  riffs:
-    title: { type: string, required: true }
 ```
 
 ## WHAT DOES IT DO?
 
-### Frontmatter lint for anything that doesn't match the declared schema *in any way*
+### Frontmatter lint for anything that doesn't match the declared schema
+- [x] Always check for title and description
+- [x] Warn if fields found that aren't in the config schema
 
 ### Build lints (`hugolint build`)
 - [x] Checks site build for orphan files (not linked to from anywhere)
@@ -83,9 +78,9 @@ index_pages:
     - `</q<`
 
 ### With-markdown AST 
-- [x] Warn on H1s (they should be in title: )
+- [x] Warn on H1s (they should be in frontmatter title)
 - [x] Warn on any heading more than 4
-- [ ] Too long link text, code formatting, bold, italic, etc.
+- [x] Too long link text, code formatting, bold, italic, etc.
 - [x] URLs
   - [x] Catch mailto: addresses that aren’t valid email syntax
   - [x] Don't allow http:// 
@@ -97,16 +92,12 @@ index_pages:
   - [x] Discourage spacing [ text ] in URL text
   - [x] Discourage and punctuation [documentation.](https://example.com) in URL text 
 
+### AST-prose lints
+- [ ] Existence of ** \`~~
+- [ ] Spellcheck on prose with aspell with an personal dictionary
+- [ ] Suffix handling (2nd, 50kg vs 50 kg)
 
 ### Non-AST checks
-- [ ] Balancing parens, quotes, formatting (** \`~~) and shortcode delimiters ({{<)
-- [ ] Spellcheck on prose with aspell with an personal dictionary
-- [ ] Word repetition like "the the"
-- [ ] Suffix handling (2nd, 50kg vs 50 kg)
-- [ ] Discourage Setext headings
-- [ ] Discourage reference links
-- [ ] Catch emphasis flanking *foo*bar* parses as <em>foo</em>bar*
-- [ ] Discourage using smart/curvy quotes in content directly
 - [ ] URLs
   - [ ] (http
   - [ ] )http
@@ -121,14 +112,19 @@ index_pages:
   - [ ] Discourage bare URLs in prose, they could start with either \n, " ", or "( but not []()"
   - [ ] [text] (/url)
   - [ ] ![alt(image.png)
-  - [ ] Reversed link syntax ()[]
+  - [x] Reversed link syntax ()[]
+- [x] Discourage reference links
+- [x] Word repetition like "the the"
+- [x] Unbalanced parens and quotes
+- [x] Discourage Setext headings 
+- [x] Discourage using smart/curvy quotes in content directly
 - [x] Broken Markdown
   - [x] Headings must start at the beginning of the line
   - [x] Lack of space after # on a new line
   - [x] Horizontal rule failures ( -- on new lines)
   - [x] Triple-star `***word*` — ambiguous, often not what the author wanted.
   - [x] Warn on lack of space after > on new lines
-  - [ ] Warn on lack of space after - on new lines
+  - [x] Warn on lack of space after - on new lines
   - [x] Spaces inside emphasis markers (** text **)
   - [x] Odd number of spaces/tabs for lists
 - [x] Invisible characters
@@ -148,18 +144,13 @@ index_pages:
   - " — floating/orphaned quote
   - : — spaced colon
   -  +- /  -+ — malformed plus-minus
-
-
-
-word.Word (missing space after punctuation)
-word/ word or word /word (asymmetrical spacing around a forward slash)
-" word " (padded spaces inside quotation marks)
-[word) (mismatched enclosure types)
-10 % (unnecessary space before a percent sign)
-$ 100 (space between currency symbol and number)
-#1 vs # 1 (inconsistent spacing with the hash/number sign)
-5'9" (using straight quotes) instead of 5′ 9″ (proper prime and double-prime symbols for feet/inches).
-word- word or word -word
- -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
- 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)
-3x5 or 3 X 5 (using the letter "x") instead of the proper multiplication sign (3 × 5).
+  - word.Word (missing space after punctuation)
+  - word/ word or word /word (asymmetrical spacing around a forward slash)
+  - " word " (padded spaces inside quotation marks)
+  - 10 % (unnecessary space before a percent sign)
+  - $ 100 (space between currency symbol and number)
+  - #1 vs # 1 (inconsistent spacing with the hash/number sign)
+  - 5'9" (using straight quotes) instead of 5′ 9″ (proper prime).
+  - word- word or word -word (space around hypen)
+  - -10 (hyphen) vs −10 (the actual, slightly wider minus sign character).
+  - 100-200 (using a standard hyphen instead of an en dash – for numerical ranges)

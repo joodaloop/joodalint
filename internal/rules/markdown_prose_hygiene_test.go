@@ -133,6 +133,67 @@ func TestProseHygiene_Cases(t *testing.T) {
 		{"he said \"hello\" to me\n", "floating/orphaned quote", false},
 		{"<a href=\"url\">link</a>\n", "floating/orphaned quote", false},
 
+		// Missing space after punctuation.
+		{"end.Then start.\n", "missing space after punctuation", true},
+		{"oops,Now what\n", "missing space after punctuation", true},
+		{"see foo.go file\n", "missing space after punctuation", false},
+		{"version 1.2.3 here\n", "missing space after punctuation", false},
+		{"the U.S.A. flag\n", "missing space after punctuation", false},
+		{"see https://example.com/foo.Bar here\n", "missing space after punctuation", false},
+		{"code `foo.Bar` here\n", "missing space after punctuation", false},
+
+		// Asymmetrical slash spacing.
+		{"cat/ dog\n", "asymmetrical spacing around /", true},
+		{"cat /dog\n", "asymmetrical spacing around /", true},
+		{"cat / dog\n", "asymmetrical spacing around /", false},
+		{"cat/dog\n", "asymmetrical spacing around /", false},
+		{"see https://example.com/path here\n", "asymmetrical spacing around /", false},
+
+		// Padded quotes.
+		{`he said " hello " to me` + "\n", "padded spaces inside quotation marks", true},
+		{`he said "hello" to me` + "\n", "padded spaces inside quotation marks", false},
+		{`<a href="url">x</a>` + "\n", "padded spaces inside quotation marks", false},
+
+		// Spaced percent.
+		{"gain 10 % yearly\n", "space before percent", true},
+		{"gain 10% yearly\n", "space before percent", false},
+
+		// Spaced currency.
+		{"costs $ 100 total\n", "space between currency symbol", true},
+		{"costs £ 50\n", "space between currency symbol", true},
+		{"costs $100 total\n", "space between currency symbol", false},
+
+		// Spaced hash.
+		{"see issue # 1 for details\n", "space after #", true},
+		{"see issue #1 for details\n", "space after #", false},
+		{"# 1\n", "space after #", false},
+		{"## Heading\n", "space after #", false},
+		{"### 1.2 Heading\n", "space after #", false},
+
+		// Straight quotes for primes.
+		{`she is 5'9" tall` + "\n", "straight quotes for feet/inches", true},
+		{`it's '90s music` + "\n", "straight quotes for feet/inches", false},
+		{`don't quote "this"` + "\n", "straight quotes for feet/inches", false},
+
+		// Asymmetrical hyphen spacing.
+		{"well- known method\n", "asymmetrical spacing around hyphen", true},
+		{"well -known method\n", "asymmetrical spacing around hyphen", true},
+		{"well-known method\n", "asymmetrical spacing around hyphen", false},
+		{"well - known method\n", "asymmetrical spacing around hyphen", false},
+		{"re-enter the room\n", "asymmetrical spacing around hyphen", false},
+
+		// Hyphen as minus.
+		{"temperature is -10 today\n", "hyphen used as minus", true},
+		{"-10 below zero\n", "hyphen used as minus", true},
+		{"pages 1-10 here\n", "hyphen used as minus", false},
+		{"- list item\n", "hyphen used as minus", false},
+
+		// Hyphen as numeric-range dash.
+		{"pages 100-200 are blank\n", "hyphen in numeric range", true},
+		{"the 1990-2000 era\n", "hyphen in numeric range", true},
+		{"date 2020-01-01 here\n", "hyphen in numeric range", false},
+		{"version 1.0-rc1 ships\n", "hyphen in numeric range", false},
+
 		// Hugo shortcode spacing.
 		{"{{<figure src=x>}}\n", "Hugo shortcode", true},
 		{"{{< figure src=x>}}\n", "Hugo shortcode", true},

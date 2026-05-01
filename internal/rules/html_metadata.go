@@ -101,9 +101,6 @@ func (headMetadata) Check(f *HTMLFile, ctx *HTMLContext) []Diagnostic {
 	if twDesc != "" && desc != "" && twDesc != desc {
 		add("twitter:description does not match <meta name=\"description\">")
 	}
-	if twImage != "" && ogImage != "" && twImage != ogImage {
-		add("twitter:image does not match og:image")
-	}
 	if twCard != "" && twCard != "summary_large_image" && twCard != "summary" && twCard != "app" && twCard != "player" {
 		add(fmt.Sprintf("twitter:card has unexpected value %q", twCard))
 	}
@@ -120,28 +117,6 @@ func (headMetadata) Check(f *HTMLFile, ctx *HTMLContext) []Diagnostic {
 	}
 	if twImage != "" {
 		checkAbsoluteURL(ctx, f, "twitter:image", twImage, true, add)
-	}
-
-	var altMD *HeadLink
-	for i := range f.HeadLinks {
-		l := f.HeadLinks[i]
-		if strings.EqualFold(l.Rel, "alternate") && strings.EqualFold(l.Type, "text/markdown") {
-			altMD = &f.HeadLinks[i]
-			break
-		}
-	}
-	if altMD == nil {
-		add(`missing <link rel="alternate" type="text/markdown">`)
-	} else if strings.TrimSpace(altMD.Href) == "" {
-		add(`<link rel="alternate" type="text/markdown"> has empty href`)
-	} else if isRelative(altMD.Href) {
-		resolved, ok := resolve(f.URLPath, altMD.Href)
-		if ok {
-			ctx.MarkLinked(resolved)
-			if !ctx.Pages[resolved] {
-				add(fmt.Sprintf(`<link rel="alternate" type="text/markdown"> href %q resolves to %s which does not exist`, altMD.Href, resolved))
-			}
-		}
 	}
 
 	return diags

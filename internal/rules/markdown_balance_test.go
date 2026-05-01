@@ -67,6 +67,17 @@ func TestBalance_NestedAndCurly(t *testing.T) {
 	assertNoDiags(t, diags)
 }
 
+func TestBalance_FenceIgnored(t *testing.T) {
+	src := "before\n```\n( unclosed\n```\nafter\n"
+	diags := markdownBalance{}.Check(mdFile(src), nil)
+	assertNoDiags(t, diags)
+}
+
+func TestBalance_CodeSpanIgnored(t *testing.T) {
+	diags := markdownBalance{}.Check(mdFile("see `( unclosed` here\n"), nil)
+	assertNoDiags(t, diags)
+}
+
 func TestBalance_ID(t *testing.T) {
 	if (markdownBalance{}).ID() != "balance" {
 		t.Fatal("wrong ID")

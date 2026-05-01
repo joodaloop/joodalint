@@ -30,13 +30,14 @@ func TestFrontmatter_NoConfigNoDiags(t *testing.T) {
 }
 
 func TestFrontmatter_NoSchemaJustUnknownChecks(t *testing.T) {
-	// Without a matching schema, existing fields are reported as unknown.
+	// Without a matching schema, title/description are still required and
+	// other fields are reported as unknown.
 	cfg := &config.Config{Paths: config.Paths{MarkdownRoot: "content"}}
 	ctx := &FrontmatterContext{Config: cfg}
-	src := "---\ntitle: Hi\nstray: yes\n---\nbody\n"
+	src := "---\ntitle: Hi\ndescription: A short description.\nstray: yes\n---\nbody\n"
 	diags := markdownFrontmatter{}.Check(fmFile("content/x.md", src), ctx)
-	if len(diags) != 2 {
-		t.Fatalf("want 2 unknown-field diags, got %v", messages(diags))
+	if len(diags) != 1 || !containsMsg(diags, `unknown field "stray"`) {
+		t.Fatalf("want 1 unknown-field diag for stray, got %v", messages(diags))
 	}
 }
 
@@ -77,17 +78,17 @@ func TestFrontmatter_StringMinMax(t *testing.T) {
 	ctx := fmCtxWithSection("root", map[string]config.FieldSpec{
 		"title": {Type: "string", Min: 5, Max: 10},
 	})
-	short := "---\ntitle: hi\n---\nbody\n"
+	short := "---\ntitle: hi\ndescription: ok desc\n---\nbody\n"
 	d := markdownFrontmatter{}.Check(fmFile("content/x.md", short), ctx)
 	if !containsMsg(d, "below min") {
 		t.Errorf("want below-min, got %v", messages(d))
 	}
-	long := "---\ntitle: thisistoolongforus\n---\nbody\n"
+	long := "---\ntitle: thisistoolongforus\ndescription: ok desc\n---\nbody\n"
 	d = markdownFrontmatter{}.Check(fmFile("content/x.md", long), ctx)
 	if !containsMsg(d, "above max") {
 		t.Errorf("want above-max, got %v", messages(d))
 	}
-	ok := "---\ntitle: hello\n---\nbody\n"
+	ok := "---\ntitle: hello\ndescription: ok desc\n---\nbody\n"
 	d = markdownFrontmatter{}.Check(fmFile("content/x.md", ok), ctx)
 	if len(d) != 0 {
 		t.Errorf("want no diags, got %v", messages(d))
@@ -118,7 +119,7 @@ func TestFrontmatter_DateValidation(t *testing.T) {
 	if !containsMsg(d, "expected date") {
 		t.Errorf("want date error, got %v", messages(d))
 	}
-	good := "---\ndate: 2024-01-15\n---\nbody\n"
+	good := "---\ntitle: t\ndescription: d\ndate: 2024-01-15\n---\nbody\n"
 	d = markdownFrontmatter{}.Check(fmFile("content/x.md", good), ctx)
 	if len(d) != 0 {
 		t.Errorf("want no diags, got %v", messages(d))
@@ -144,10 +145,37 @@ func TestFrontmatter_UnknownFieldDeterministic(t *testing.T) {
 	ctx := fmCtxWithSection("root", map[string]config.FieldSpec{
 		"title": {Type: "string"},
 	})
-	src := "---\ntitle: hi\nzeta: 1\nalpha: 2\n---\nbody\n"
+	src := "---\ntitle: hi\ndescription: d\nzeta: 1\nalpha: 2\n---\nbody\n"
 	d := markdownFrontmatter{}.Check(fmFile("content/x.md", src), ctx)
 	if len(d) != 2 || d[0].Message > d[1].Message {
 		t.Fatalf("want 2 sorted unknown-field diags, got %v", messages(d))
+	}
+}
+
+func TestFrontmatter_AlwaysRequiresTitleAndDescription(t *testing.T) {
+	cfg := &config.Config{Paths: config.Paths{MarkdownRoot: "content"}}
+	ctx := &FrontmatterContext{Config: cfg}
+	src := "---\nfoo: bar\n---\nbody\n"
+	d := markdownFrontmatter{}.Check(fmFile("content/x.md", src), ctx)
+	if !containsMsg(d, `missing required field "title"`) {
+		t.Errorf("want missing title, got %v", messages(d))
+	}
+	if !containsMsg(d, `missing required field "description"`) {
+		t.Errorf("want missing description, got %v", messages(d))
+	}
+}
+
+func TestFrontmatter_DescriptionTooLong(t *testing.T) {
+	cfg := &config.Config{Paths: config.Paths{MarkdownRoot: "content"}}
+	ctx := &FrontmatterContext{Config: cfg}
+	long := ""
+	for i := 0; i < 161; i++ {
+		long += "a"
+	}
+	src := "---\ntitle: hi\ndescription: " + long + "\n---\nbody\n"
+	d := markdownFrontmatter{}.Check(fmFile("content/x.md", src), ctx)
+	if !containsMsg(d, "above max 160") {
+		t.Errorf("want description-too-long, got %v", messages(d))
 	}
 }
 

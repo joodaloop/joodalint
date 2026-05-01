@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 func init() {
@@ -21,24 +22,44 @@ type openDelim struct {
 
 func (markdownBalance) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 	var diags []Diagnostic
-	content := f.Body
-	scanner := bufio.NewScanner(bytes.NewReader(content))
+	scanner := bufio.NewScanner(bytes.NewReader(f.Body))
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
 	var stack []openDelim
 	quoteOpen := false
 	quoteLine := 0
 
+	inFence := false
 	line := f.BodyStartLine - 1
+
 	for scanner.Scan() {
 		line++
 		text := scanner.Text()
+		trimmed := strings.TrimLeft(text, " \t")
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence {
+			continue
+		}
+
+		inCodeSpan := false
 		for i := 0; i < len(text); i++ {
 			c := text[i]
 			if c == '\\' {
 				i++
 				continue
 			}
+
+			if c == '`' {
+				inCodeSpan = !inCodeSpan
+				continue
+			}
+			if inCodeSpan {
+				continue
+			}
+
 			switch c {
 			case '(', '[', '{':
 				stack = append(stack, openDelim{ch: c, line: line})

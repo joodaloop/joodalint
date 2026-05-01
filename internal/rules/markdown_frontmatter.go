@@ -26,19 +26,7 @@ func (markdownFrontmatter) Check(f *FrontmatterFile, ctx *FrontmatterContext) []
 	_, schema := ctx.Config.SchemaFor(f.Path)
 	hasFrontmatter := f.Line0 > 0
 	fmLine := f.Line0
-	if schema == nil {
-		if !hasFrontmatter {
-			return nil
-		}
-		var parsed map[string]any
-		if err := yaml.Unmarshal(f.Raw, &parsed); err != nil {
-			return []Diagnostic{{
-				Path: f.Path, Line: fmLine, Rule: "frontmatter",
-				Message: fmt.Sprintf("invalid YAML: %v", err),
-			}}
-		}
-		return unknownFieldDiagnostics(f.Path, fmLine, parsed, nil)
-	}
+
 	if !hasFrontmatter {
 		return []Diagnostic{{
 			Path: f.Path, Line: 1, Rule: "frontmatter",
@@ -55,37 +43,67 @@ func (markdownFrontmatter) Check(f *FrontmatterFile, ctx *FrontmatterContext) []
 	}
 
 	var diags []Diagnostic
+	diags = append(diags, checkTitleDescription(f.Path, fmLine, parsed, schema)...)
 
-	// Required + per-field validation, in deterministic order.
-	keys := make([]string, 0, len(schema))
-	for k := range schema {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	if schema != nil {
+		// Required + per-field validation, in deterministic order.
+		keys := make([]string, 0, len(schema))
+		for k := range schema {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 
-	for _, name := range keys {
-		spec := schema[name]
-		val, present := parsed[name]
-		if !present {
-			if spec.Required {
+		for _, name := range keys {
+			spec := schema[name]
+			val, present := parsed[name]
+			if !present {
+				if spec.Required {
+					diags = append(diags, Diagnostic{
+						Path: f.Path, Line: fmLine, Rule: "frontmatter",
+						Message: fmt.Sprintf("missing required field %q", name),
+					})
+				}
+				continue
+			}
+			if msg := validate(name, val, spec); msg != "" {
 				diags = append(diags, Diagnostic{
 					Path: f.Path, Line: fmLine, Rule: "frontmatter",
+					Message: msg,
+				})
+			}
+		}
+	}
+
+	diags = append(diags, unknownFieldDiagnostics(f.Path, fmLine, parsed, schema)...)
+
+	return diags
+}
+
+const descriptionMaxLen = 160
+
+func checkTitleDescription(path string, line int, parsed map[string]any, schema map[string]config.FieldSpec) []Diagnostic {
+	var diags []Diagnostic
+	for _, name := range []string{"title", "description"} {
+		_, schemaCovers := schema[name]
+		val, present := parsed[name]
+		if !present {
+			if !schemaCovers {
+				diags = append(diags, Diagnostic{
+					Path: path, Line: line, Rule: "frontmatter",
 					Message: fmt.Sprintf("missing required field %q", name),
 				})
 			}
 			continue
 		}
-		if msg := validate(name, val, spec); msg != "" {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: fmLine, Rule: "frontmatter",
-				Message: msg,
-			})
+		if name == "description" {
+			if s, ok := val.(string); ok && len([]rune(s)) > descriptionMaxLen {
+				diags = append(diags, Diagnostic{
+					Path: path, Line: line, Rule: "frontmatter",
+					Message: fmt.Sprintf("field %q: length %d above max %d", name, len([]rune(s)), descriptionMaxLen),
+				})
+			}
 		}
 	}
-
-	// Unknown fields.
-	diags = append(diags, unknownFieldDiagnostics(f.Path, fmLine, parsed, schema)...)
-
 	return diags
 }
 
@@ -302,6 +320,9 @@ func kindOf(v any) string {
 func unknownFieldDiagnostics(path string, line int, parsed map[string]any, schema map[string]config.FieldSpec) []Diagnostic {
 	unknown := make([]string, 0)
 	for name := range parsed {
+		if name == "title" || name == "description" {
+			continue
+		}
 		if schema != nil {
 			if _, ok := schema[name]; ok {
 				continue
