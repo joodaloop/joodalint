@@ -96,12 +96,11 @@ index_pages:
   - [x] Discourage and punctuation [documentation.](https://example.com) in URL text 
 
 ### AST-prose lints
-- [ ] Existence of ** \`~~
+- [x] Existence of ** \`~~
 - [x] Spellcheck on prose with aspell with an personal dictionary
 - [x] Suffix handling (2nd, 50kg vs 50 kg)
 - [x] Unbalanced parens and quotes
-- [ ] Nonsense
-  - word.Word (missing space after punctuation)
+- [x] word.Word (missing space after punctuation)
 
 ### Non-AST checks
 - [x] Discourage using smart/curvy quotes in content directly

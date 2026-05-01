@@ -10,7 +10,7 @@ func TestFormattingShortSpansOK(t *testing.T) {
 
 func TestFormattingLongItalic(t *testing.T) {
 	// 101-character italic span — should warn.
-	text := "*" + repeat("a", 101) + "*\n"
+	text := "*" + repeat("a", 121) + "*\n"
 	diags := markdownFormatting{}.Check(mdFile(text), nil)
 	if len(diags) != 1 {
 		t.Fatalf("want 1 diag, got %d: %v", len(diags), messages(diags))
@@ -24,7 +24,7 @@ func TestFormattingLongItalic(t *testing.T) {
 }
 
 func TestFormattingLongBold(t *testing.T) {
-	text := "**" + repeat("b", 120) + "**\n"
+	text := "**" + repeat("b", 121) + "**\n"
 	diags := markdownFormatting{}.Check(mdFile(text), nil)
 	if len(diags) != 1 {
 		t.Fatalf("want 1 diag, got %d: %v", len(diags), messages(diags))

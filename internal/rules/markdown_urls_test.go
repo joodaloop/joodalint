@@ -266,15 +266,15 @@ func TestURLs_UnsafeCharsFlagged(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"[a](https://x.com/“hi”)\n", "unencoded characters"},   // smart quotes
-		{"[a](https://x.com/\"foo)\n", "unencoded characters"},  // straight dquote
-		{"[a](https://x.com/foo|bar)\n", "unencoded characters"}, // pipe
-		{"[a](https://x.com/foo^bar)\n", "unencoded characters"}, // caret
-		{"[a](https://x.com/foo`bar)\n", "unencoded characters"}, // backtick
-		{"[a](https://x.com/foo{x})\n", "unencoded characters"},  // braces
-		{"[a](https://x.com/foo\\bar)\n", "unencoded characters"}, // backslash
-		{"[a](https://x.com/<foo)\n", "unencoded characters"},    // less-than
-		{"[a](https://x.com/café)\n", "unencoded characters"},    // raw unicode
+		{"[a](https://x.com/“hi”)\n", "unencoded characters"},      // smart quotes
+		{"[a](https://x.com/\"foo)\n", "unencoded characters"},     // straight dquote
+		{"[a](https://x.com/foo|bar)\n", "unencoded characters"},   // pipe
+		{"[a](https://x.com/foo^bar)\n", "unencoded characters"},   // caret
+		{"[a](https://x.com/foo`bar)\n", "unencoded characters"},   // backtick
+		{"[a](https://x.com/foo{x})\n", "unencoded characters"},    // braces
+		{"[a](https://x.com/foo\\bar)\n", "unencoded characters"},  // backslash
+		{"[a](https://x.com/<foo)\n", "unencoded characters"},      // less-than
+		{"[a](https://x.com/café)\n", "unencoded characters"},      // raw unicode
 		{"[a](<https://x.com/foo bar>)\n", "unencoded characters"}, // angle-bracket form lets a space through
 	}
 	for _, tc := range cases {
@@ -436,7 +436,7 @@ func TestURLs_LinkNoTrailingPunctuationOK(t *testing.T) {
 
 func TestURLs_LongLinkText(t *testing.T) {
 	long := ""
-	for i := 0; i < 110; i++ {
+	for i := 0; i < 121; i++ {
 		long += "a"
 	}
 	src := "[" + long + "](https://example.com)\n"

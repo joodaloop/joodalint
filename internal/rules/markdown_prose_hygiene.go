@@ -129,8 +129,16 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		}
 
 		// Invisible / zero-width characters.
-		for _, r := range text {
+		runes := []rune(text)
+		for i, r := range runes {
 			if name, ok := invisibleChars[r]; ok {
+				// U+200D is used legitimately in emoji ZWJ sequences
+				// (e.g. 👨‍💻). Only flag it when not between emoji-like
+				// codepoints.
+				if r == '\u200D' && i > 0 && i < len(runes)-1 &&
+					runes[i-1] > 0x7F && runes[i+1] > 0x7F {
+					continue
+				}
 				diags = append(diags, Diagnostic{
 					Path: f.Path, Line: line, Rule: "prose-hygiene",
 					Message: fmt.Sprintf("invisible character: %s", name),

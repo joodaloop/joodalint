@@ -40,6 +40,9 @@ var astLiteralPatterns = []astLiteralPattern{
 	{" . ", "space around period"},
 	{" !", "space before exclamation mark"},
 	{" ?", "space before question mark"},
+	{"**", "unescaped bold markers (**)"},
+	{"~~", "unescaped strikethrough markers (~~)"},
+	{"__", "unescaped emphasis markers (__)"},
 }
 
 func (markdownProseHygieneAST) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
@@ -176,6 +179,9 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 		if a != b {
 			continue
 		}
+		if a == "had" || a == "that" {
+			continue
+		}
 		emit(idx[i][0], fmt.Sprintf("repeated word: %q", a+" "+a))
 	}
 
@@ -195,11 +201,10 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 			emit(pos, "underscore emphasis (use * instead)")
 		}
 	}
-	if loc := missingSpacePunct.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "missing space after punctuation")
-	}
 	if loc := asymSlash.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "asymmetrical spacing around /")
+		if !strings.HasPrefix(masked[loc[0]:loc[1]], "w/") {
+			emit(loc[0], "asymmetrical spacing around /")
+		}
 	}
 	if loc := asymHyphen.FindStringIndex(masked); loc != nil {
 		emit(loc[0], "asymmetrical spacing around hyphen")
@@ -256,6 +261,9 @@ func proseSpanChecks(f *MarkdownFile, sp ProseSpan) []Diagnostic {
 	if strings.Contains(text, "#") && spacedHash.MatchString(text) {
 		emit("space after # before number (# 1, prefer #1)")
 	}
+	if missingSpacePunct.MatchString(text) {
+		emit("missing space after punctuation")
+	}
 	return diags
 }
 
@@ -280,7 +288,7 @@ func proseQuoteChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 		if floatingQuote.MatchString(rawText) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "prose-hygiene",
-				Message: `floating/orphaned quote (")`,
+				Message: `spaces around quote ( " )`,
 			})
 		}
 		if paddedQuote.MatchString(rawText) {
@@ -318,4 +326,3 @@ func proseQuoteChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 	}
 	return diags
 }
-

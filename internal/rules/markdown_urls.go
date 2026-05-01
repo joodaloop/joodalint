@@ -26,6 +26,7 @@ func (markdownImageAlt) ID() string { return "image-alt" }
 // Empty/whitespace alts are reported by the empty-image-alt diagnostic
 // inside markdownURLs.
 const maxLinkTextLen = 120
+const maxLinkPunctuationLen = 20
 
 var genericAlts = map[string]bool{
 	"image":      true,
@@ -126,7 +127,7 @@ func (markdownURLs) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagnostic {
 						Message: "link text contains extra spaces",
 					})
 				}
-				if text != "" {
+				if text != "" && len([]rune(text)) < maxLinkPunctuationLen {
 					if last := text[len(text)-1]; strings.ContainsRune(`.,;:!?'"()`, rune(last)) {
 						if !(last == ')' && strings.ContainsRune(text[:len(text)-1], '(')) {
 							diags = append(diags, Diagnostic{
