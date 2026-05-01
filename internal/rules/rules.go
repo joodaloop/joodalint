@@ -126,11 +126,10 @@ type MarkdownContext struct {
 }
 
 type FrontmatterFile struct {
-	Path   string
-	Raw    []byte
-	Parsed map[string]any
+	Path     string
+	Parsed   map[string]any
 	ParseErr error
-	Line0  int
+	Line0    int
 }
 
 type FrontmatterContext struct {

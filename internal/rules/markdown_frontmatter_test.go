@@ -18,7 +18,6 @@ func fmFile(path, src string) *FrontmatterFile {
 	parsed, err := ParseFrontmatterYAML(raw)
 	return &FrontmatterFile{
 		Path:     path,
-		Raw:      raw,
 		Parsed:   parsed,
 		ParseErr: err,
 		Line0:    line0,

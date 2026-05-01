@@ -84,7 +84,6 @@ func BenchmarkFrontmatterRuleCheck(b *testing.B) {
 	ctx := benchFrontmatterContext(benchFrontmatterSchema(40))
 	f := &FrontmatterFile{
 		Path:   "content/bench.md",
-		Raw:    raw,
 		Parsed: parsed,
 		Line0:  line0,
 	}
