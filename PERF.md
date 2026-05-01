@@ -38,26 +38,28 @@ costs.
 | `headings`        | 2 232 MB/s | 11.6 us  | 6 |
 | `url`             | 798 MB/s   | 32.4 us  | 144 |
 | `balance`         | 370 MB/s   | 69.8 us  | 359 |
-| `prose-hygiene`   | 4.11 MB/s  | 6.30 ms  | 11 003 |
+| `prose-hygiene`   | 13.2 MB/s  | 1.95 ms  | 5 931 |
 
-`prose-hygiene` is still the clear in-process Markdown bottleneck. It is
-roughly:
+`prose-hygiene` is still the clear in-process Markdown bottleneck, but the
+optimized version is much cheaper. It is now roughly:
 
-- 90x slower than `balance`
-- 194x slower than `url`
-- 543x slower than `formatting`
-- 1 057x slower than `image-alt`
+- 28x slower than `balance`
+- 60x slower than `url`
+- 224x slower than `formatting`
+- 325x slower than `image-alt`
 
 Scaling for `prose-hygiene` is linear and consistent:
 
 | Size | Throughput | Per-call | Allocs |
 |---|---|---|---|
-| Small  (~5 KB)   | 4.12 MB/s | 1.25 ms | 2 196 |
-| Medium (~26 KB)  | 4.11 MB/s | 6.29 ms | 11 003 |
-| Large  (~104 KB) | 4.13 MB/s | 25.1 ms | 44 032 |
+| Small  (~5 KB)   | 13.28 MB/s | 0.389 ms | 1 184 |
+| Medium (~26 KB)  | 13.20 MB/s | 1.96 ms  | 5 931 |
+| Large  (~104 KB) | 13.28 MB/s | 7.80 ms  | 23 732 |
 
-The allocator profile also scales linearly, which matches the current
-`ReplaceAllString` pipeline and regex-heavy line loop.
+That is about a 3.2x throughput win, about 69% lower latency, and about 46%
+fewer allocations than the earlier baseline. The allocator profile still
+scales linearly, but the old `ReplaceAllString` pipeline is no longer the main
+cost shape.
 
 ### HTML rules, ranked (synthetic page with 100 internal pages / assets)
 | Rule | Per-call | Allocs |
@@ -139,15 +141,27 @@ Interpretation:
 ## Bottleneck ranking
 
 ### 1. `prose-hygiene` is the biggest in-process cost by a wide margin
-At ~6.3 ms for a medium file, it dominates every other Go-side Markdown rule.
+At ~2.0 ms for a medium file in the last measured optimized run, it still
+dominates every other Go-side Markdown rule.
 This is the highest-leverage pure-Go optimization target.
 
-Likely wins:
+Implemented:
 
-- Fuse the four `ReplaceAllString` passes into one scrubber.
-- Add a cheap byte-class precheck before the regex bank.
-- Collapse repeated literal substring checks into a single multi-needle pass.
-- Skip expensive `*` handling on lines without `*`.
+- Implemented: fused the four `ReplaceAllString` passes into one scrubber.
+- Implemented: added cheap byte/substr prechecks before most regex work.
+- Implemented: cut allocations by roughly half in the measured synthetic
+  benchmark.
+
+Not kept:
+
+- The literal lead-byte prefilter was not worth its complexity.
+- The `***` ambiguity check was removed entirely.
+
+Measurement note:
+
+- The table above records the last measured optimized run. The final
+  "worthwhile guards restored, `***` removed" cleanup was not rerun, so no
+  post-cleanup benchmark number is asserted here.
 
 ### 2. `aspell` is the biggest cost when spelling is enabled
 This is now measured, not inferred. A ~4 ms per-file startup tax is large

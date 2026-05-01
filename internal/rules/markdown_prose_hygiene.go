@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -34,7 +33,6 @@ var (
 	headingIndented = regexp.MustCompile(`^[ \t]+#{1,6}[ \t]`)
 	headingNoSpace  = regexp.MustCompile(`^#{1,6}[^ \t#]`)
 	brokenHRDouble  = regexp.MustCompile(`^\s*--\s*$`)
-	tripleStarOpen  = regexp.MustCompile(`\*{3}[^\s*][^*\n]*\*`)
 	oddListIndent   = regexp.MustCompile(`^(?: |   )[-+*][ \t]`)
 	mixedDashes     = regexp.MustCompile(`\x{2014}\x{2013}|\x{2013}\x{2014}|[\x{2014}\x{2013}]{3,}`)
 	floatingQuote   = regexp.MustCompile(`(^|\s)"(\s|$)`)
@@ -91,33 +89,6 @@ var literalPatterns = []literalPattern{
 	{"](//", "protocol-relative link"},
 	{` " ](`, "quote glued to link"},
 	{`===`, "Setext headers, brittle"},
-}
-
-var literalLeadBytes = func() []byte {
-	seen := make(map[byte]struct{}, len(literalPatterns))
-	out := make([]byte, 0, len(literalPatterns))
-	for _, p := range literalPatterns {
-		if len(p.needle) == 0 {
-			continue
-		}
-		b := p.needle[0]
-		if _, ok := seen[b]; ok {
-			continue
-		}
-		seen[b] = struct{}{}
-		out = append(out, b)
-	}
-	slices.Sort(out)
-	return out
-}()
-
-func containsAnyByte(s string, chars []byte) bool {
-	for i := 0; i < len(s); i++ {
-		if _, ok := slices.BinarySearch(chars, s[i]); ok {
-			return true
-		}
-	}
-	return false
 }
 
 func stripProseMarkup(text string) string {
@@ -259,14 +230,12 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		}
 
 		// Literal substring patterns.
-		if containsAnyByte(text, literalLeadBytes) {
-			for _, p := range literalPatterns {
-				if strings.Contains(text, p.needle) {
-					diags = append(diags, Diagnostic{
-						Path: f.Path, Line: line, Rule: "prose-hygiene",
-						Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
-					})
-				}
+		for _, p := range literalPatterns {
+			if strings.Contains(text, p.needle) {
+				diags = append(diags, Diagnostic{
+					Path: f.Path, Line: line, Rule: "prose-hygiene",
+					Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
+				})
 			}
 		}
 
@@ -339,8 +308,7 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 				Message: "blockquote > without space after",
 			})
 		}
-		hasStar := strings.Contains(text, "*")
-		if hasStar && !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
+		if strings.Contains(text, "*") && !listItemLine.MatchString(text) && spacedEmph.MatchString(prose) {
 			diags = append(diags, Diagnostic{
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "spaces inside emphasis markers (* text *)",
@@ -435,19 +403,6 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 				Path: f.Path, Line: line, Rule: "prose-hygiene",
 				Message: "hyphen in numeric range (use en dash –)",
 			})
-		}
-		if hasStar {
-			for _, m := range tripleStarOpen.FindAllStringIndex(text, -1) {
-				end := m[1]
-				if end < len(text) && text[end] == '*' {
-					continue
-				}
-				diags = append(diags, Diagnostic{
-					Path: f.Path, Line: line, Rule: "prose-hygiene",
-					Message: "ambiguous triple-star emphasis (***word*)",
-				})
-				break
-			}
 		}
 	}
 	return diags

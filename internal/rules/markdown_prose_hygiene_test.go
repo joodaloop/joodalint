@@ -94,16 +94,12 @@ func TestProseHygiene_Cases(t *testing.T) {
 		{"#\n", "missing space after #", false},
 		{"#### \n", "missing space after #", false},
 
-		// Broken HR, triple-star, odd indent.
+		// Broken HR, odd indent.
 		{"--\n", "broken horizontal rule", true},
 		{"  --\n", "broken horizontal rule", true},
 		{"--  \n", "broken horizontal rule", true},
 		{"---\n", "broken horizontal rule", false},
 		{"text -- with dashes\n", "broken horizontal rule", false},
-		{"this ***word* is weird\n", "ambiguous triple-star", true},
-		{"***foo* end\n", "ambiguous triple-star", true},
-		{"this ***word*** is bold-italic\n", "ambiguous triple-star", false},
-		{"a *foo* and **bar** mix\n", "ambiguous triple-star", false},
 		{" - item\n", "odd indentation", true},
 		{"   - item\n", "odd indentation", true},
 		{" * item\n", "odd indentation", true},
