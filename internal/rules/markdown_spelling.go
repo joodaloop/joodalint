@@ -39,7 +39,6 @@ func (m *markdownSpelling) Check(f *MarkdownFile, ctx *MarkdownContext) []Diagno
 	for _, blk := range f.ProseBlocks {
 		for _, sp := range blk.Spans {
 			buf.Write(sp.Text)
-			buf.WriteString("\n\n")
 		}
 		buf.WriteString("\n\n")
 	}
