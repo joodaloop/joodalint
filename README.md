@@ -2,7 +2,7 @@
 the sanest linter in the world
 
 ## CONFIGURATION
-Put this in the folder from where you run `joodalint md` or `joodalint build`
+Put this in the folder from where you run `joodalint md` (Markdown prose lint), `joodalint build` (site build output checks), or `joodaloop help` (general website assistance).
 
 (Note: You don't have to specify a title in your schemas, our linting requires *all* your pages have one)
 
