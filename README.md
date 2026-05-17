@@ -56,6 +56,7 @@ index_pages:
 - [ ] lint for llm phrases with a shaming message
 - [x] Graph frequency of publishing
 - [x] The linter scans the _drafts directory. If there are more drafts than published posts, it points you to the most written ones.
+- [ ] Print out word count graph too (?)
 
 ### Frontmatter lint for anything that doesn't match the declared schema
 - [x] Always check for title
@@ -93,6 +94,7 @@ index_pages:
 - [x] Too long link text, code formatting, bold, italic, etc.
 - [x] Word repetition like "the the"
 - [ ] URLs
+  - [ ] https://gwern.net.style-guide
   - [ ] Duplicate trailing slashes, double slashes in paths
   - [x] Catch mailto: addresses that aren’t valid email syntax
   - [x] Don't allow http:// 
@@ -173,3 +175,26 @@ index_pages:
 - [x] Doubled / malformed punctuation & dashes & suspicious spacing
   - 5'9" (using straight quotes) instead of 5′ 9″ (proper prime).
   - " ]( quote glued to link
+
+## NEXT UP
+- [ ] Read https://gwern.net/style-guide#terminology-and-notation
+- [ ] Add "markdown syntax found in HTML" lints (should it also catch "almost Markdown"?)
+- [ ] Come up with ideas for `joodalint help` commands
+  - [ ] Recommend better slugs
+- [ ] Frontmatter checks
+  - [ ] exactly one metadata block;
+  - [ ] field order canonical;
+  - [ ] no duplicate fields;
+  - [ ] mandatory fields present;
+  - [ ] title ≤13 words;
+  - [ ] description 20–650 chars unless exempt;
+  - [ ] dates after 2008-01-01 and before 'tomorrow';
+  - [ ] modified ≥ created;
+  - [ ] status, confidence, css-extension are enums;
+  - [ ] importance: 0–10;
+  - [ ] thumbnail-css only if thumbnail;
+  - [ ] thumbnail exists and is not SVG for social-preview contexts;
+  - [ ] thumbnail-text optional for new thumbnails, but if exists, can be compiled as Gwerndown.
+  - [ ] css-extension should be a list of known page classes, not a free string.
+- [ ] Symbols next to other symbols
+  - [ ] > is ?

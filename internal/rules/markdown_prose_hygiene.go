@@ -69,6 +69,18 @@ var invisibleChars = map[rune]string{
 	'\u00A0': "non-breaking space (U+00A0)",
 }
 
+// nameC1Control returns a descriptive name for any C1 control character
+// (U+0080\u2013U+009F). These are non-printable in Unicode but reused by
+// Windows-1252 for punctuation (curly quotes, em/en dashes, ellipsis);
+// when Win-1252 text is pasted into UTF-8 without conversion, the bytes
+// survive as these control codepoints \u2014 a reliable mojibake signature.
+func nameC1Control(r rune) (string, bool) {
+	if r < 0x0080 || r > 0x009F {
+		return "", false
+	}
+	return fmt.Sprintf("C1 control character (U+%04X, likely Windows-1252 mojibake)", r), true
+}
+
 type literalPattern struct {
 	needle string
 	msg    string
@@ -131,7 +143,11 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		// Invisible / zero-width characters.
 		runes := []rune(text)
 		for i, r := range runes {
-			if name, ok := invisibleChars[r]; ok {
+			name, ok := invisibleChars[r]
+				if !ok {
+					name, ok = nameC1Control(r)
+				}
+				if ok {
 				// U+200D is used legitimately in emoji ZWJ sequences
 				// (e.g. 👨‍💻). Only flag it when not between emoji-like
 				// codepoints.

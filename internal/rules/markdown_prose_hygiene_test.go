@@ -82,6 +82,11 @@ func TestProseHygiene_Cases(t *testing.T) {
 		{"foo\uFEFFbar\n", "byte-order mark", true},
 		{"soft\u00ADhyphen\n", "soft hyphen", true},
 		{"non\u00A0break\n", "non-breaking space", true},
+		{"that\u0092s\n", "C1 control character (U+0092", true},
+		{"em\u0097dash\n", "C1 control character (U+0097", true},
+		{"curly\u0093quote\n", "C1 control character (U+0093", true},
+		{"plain\u0080text\n", "C1 control character (U+0080", true},
+		{"edge\u009fcase\n", "C1 control character (U+009F", true},
 		{"plain ascii text\nwith émojis café\n", "invisible character", false},
 
 		// Structural literal needles.
