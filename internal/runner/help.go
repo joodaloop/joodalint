@@ -24,7 +24,7 @@ var dateLayouts = []string{
 func Help(cfg *config.Config) error {
 	root := cfg.Paths.MarkdownRoot
 	paths, err := walk(root, func(path string, d fs.DirEntry) bool {
-		if d.IsDir() && cfg.SkipDir(d.Name()) {
+		if cfg.SkipMarkdown(root, path) {
 			return false
 		}
 		if d.IsDir() {
@@ -37,7 +37,7 @@ func Help(cfg *config.Config) error {
 	}
 	draftPaths, err := walk(root, func(path string, d fs.DirEntry) bool {
 		if d.IsDir() {
-			if cfg.SkipDir(d.Name()) {
+			if cfg.SkipMarkdown(root, path) {
 				return strings.Contains(strings.ToLower(d.Name()), "draft")
 			}
 			return true

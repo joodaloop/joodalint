@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	ignore "github.com/sabhiram/go-gitignore"
+
 	"github.com/goccy/go-yaml"
 )
 
@@ -15,6 +17,9 @@ type Config struct {
 	IndexSections map[string]map[string]FieldSpec `yaml:"index_pages"`
 	Links         Links                           `yaml:"links"`
 	Spelling      Spelling                        `yaml:"spelling"`
+
+	mdMatcher    *ignore.GitIgnore
+	buildMatcher *ignore.GitIgnore
 }
 
 type Links struct {
@@ -28,7 +33,8 @@ type Spelling struct {
 type Paths struct {
 	MarkdownRoot string   `yaml:"markdown_root"`
 	BuildRoot    string   `yaml:"build_root"`
-	SkipDirs     []string `yaml:"skip_dirs"`
+	MarkdownSkip []string `yaml:"markdown_skip"`
+	BuildSkip    []string `yaml:"build_skip"`
 }
 
 type FieldSpec struct {
@@ -94,12 +100,39 @@ func (c *Config) SchemaFor(filePath string) (string, map[string]FieldSpec) {
 	return bestKey, table[bestKey]
 }
 
-// SkipDir reports whether a directory name should be skipped during traversal.
-func (c *Config) SkipDir(name string) bool {
-	for _, d := range c.Paths.SkipDirs {
-		if d == name {
-			return true
-		}
+// SkipMarkdown reports whether a path (file or directory) under the markdown
+// root should be skipped by the md/help commands. Patterns in markdown_skip use
+// .gitignore syntax; see matchSkip.
+func (c *Config) SkipMarkdown(root, p string) bool {
+	if c.mdMatcher == nil {
+		c.mdMatcher = ignore.CompileIgnoreLines(c.Paths.MarkdownSkip...)
 	}
-	return false
+	return matchSkip(c.mdMatcher, root, p)
+}
+
+// SkipBuild reports whether a path (file or directory) under the build root
+// should be skipped by the build command. Patterns in build_skip use .gitignore
+// syntax; see matchSkip.
+func (c *Config) SkipBuild(root, p string) bool {
+	if c.buildMatcher == nil {
+		c.buildMatcher = ignore.CompileIgnoreLines(c.Paths.BuildSkip...)
+	}
+	return matchSkip(c.buildMatcher, root, p)
+}
+
+// matchSkip reports whether p matches the gitignore matcher. p is matched as a
+// path relative to root, so patterns are interpreted exactly like .gitignore
+// entries rooted at the content/build folder: a bare name ("drafts", "*.wip.md")
+// matches at any depth, "notes/*" is anchored to the root, and a matched
+// directory skips its entire subtree.
+func matchSkip(m *ignore.GitIgnore, root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	if rel == "." {
+		return false
+	}
+	return m.MatchesPath(rel)
 }

@@ -10,7 +10,13 @@ Put this in the folder from where you run `joodalint md` (Markdown prose lint), 
 paths:
   markdown_root: content # folder containing your content .md files
   build_root: public # folder that will contain the built site
-  skip_dirs: [drafts] # folders within the `markdown_root` that shouldn't be linted
+  markdown_skip: [drafts, changelog.md, "notes/*", "*.wip.md"] # paths the `md`/`help` commands skip
+  build_skip: [vendor, 404.html] # paths the `build` command skips
+  # skip lists use .gitignore syntax, rooted at the content/build folder:
+  #   drafts        skip the whole drafts/ subtree, wherever it appears
+  #   notes/*       skip everything under the top-level notes/ folder
+  #   *.wip.md      skip any file with this name, at any depth
+  #   changelog.md  skip that file anywhere
 
 links:
   site_hosts: [joodaloop.com, www.joodaloop.com] # your site's URLs

@@ -25,7 +25,7 @@ import (
 func Markdown(cfg *config.Config) (int, error) {
 	root := cfg.Paths.MarkdownRoot
 	paths, err := walk(root, func(path string, d fs.DirEntry) bool {
-		if d.IsDir() && cfg.SkipDir(d.Name()) {
+		if cfg.SkipMarkdown(root, path) {
 			return false
 		}
 		if d.IsDir() {
@@ -101,7 +101,7 @@ func Markdown(cfg *config.Config) (int, error) {
 }
 
 func Build(cfg *config.Config, root string) (int, error) {
-	files, allFiles, pages, pageIDs, err := loadHTML(root)
+	files, allFiles, pages, pageIDs, err := loadHTML(cfg, root)
 	if err != nil {
 		return 0, err
 	}
@@ -133,7 +133,7 @@ func Build(cfg *config.Config, root string) (int, error) {
 	return len(diags), nil
 }
 
-func loadHTML(root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]bool, map[string]map[string]int, error) {
+func loadHTML(cfg *config.Config, root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]bool, map[string]map[string]int, error) {
 	pages := make(map[string]bool)
 	pageIDs := make(map[string]map[string]int)
 	var files []*rules.HTMLFile
@@ -164,6 +164,11 @@ func loadHTML(root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]boo
 		allFiles = append(allFiles, rules.BuiltFile{Path: p, URLPath: urlPathFor(root, p)})
 
 		if !strings.HasSuffix(p, ".html") {
+			return nil
+		}
+		// Skipped files are still registered above as valid page/asset
+		// targets, but we don't run any rules against their contents.
+		if cfg.SkipBuild(root, p) {
 			return nil
 		}
 		b, err := os.ReadFile(p)
