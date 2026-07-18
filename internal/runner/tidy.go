@@ -3,19 +3,18 @@ package runner
 import (
 	"bytes"
 	"fmt"
-	"io/fs"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/joodaloop/joodalint/internal/rules"
 )
 
-// tidyDiagnostics shells out to tidy-html5 for every .html file under root.
-// Returns nil diagnostics (and no error) when tidy is missing or is Apple's
-// HTML4-era build, so `lint build` stays usable without the dependency.
-func tidyDiagnostics(root string) ([]rules.Diagnostic, error) {
+// tidyDiagnostics shells out to tidy-html5 for every non-skipped .html
+// file in the build. Returns nil diagnostics (and no error) when tidy is
+// missing or is Apple's HTML4-era build, so `lint build` stays usable
+// without the dependency.
+func tidyDiagnostics(files []rules.BuiltFile) ([]rules.Diagnostic, error) {
 	if _, err := exec.LookPath("tidy"); err != nil {
 		fmt.Println("joodalint: tidy not installed — skipping HTML validity check. (brew install tidy-html5)")
 		return nil, nil
@@ -28,21 +27,14 @@ func tidyDiagnostics(root string) ([]rules.Diagnostic, error) {
 	}
 
 	var paths []string
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, f := range files {
+		if f.Skipped || !strings.HasSuffix(f.Path, ".html") {
+			continue
 		}
-		if d.IsDir() || !strings.HasSuffix(p, ".html") {
-			return nil
-		}
-		paths = append(paths, p)
-		return nil
-	})
-	if err != nil {
-		return nil, err
+		paths = append(paths, f.Path)
 	}
 
-	return runParallel(paths, func(p string) []rules.Diagnostic {
+	return runFiles(paths, func(p string) []rules.Diagnostic {
 		cmd := exec.Command("tidy", "-quiet", "-errors", "--gnu-emacs", "yes",
 			"--new-blocklevel-tags", "command-menu,fulltext-search,chat-form", p)
 		out, _ := cmd.CombinedOutput()

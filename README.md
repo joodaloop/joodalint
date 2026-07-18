@@ -72,11 +72,13 @@ index_pages:
 
 ### Build lints (`joodalint build`)
 - [x] Throw a warning on excessive Javascript
+- [x] Build size summary (bytes and file count per category — HTML, CSS, JS, JSON, XML, images, fonts, video, audio, PDF, wasm, other — with real gzipped sizes for the text formats)
+- [x] Flag large images (>500KB) and PNGs (with an estimated size for lossless webp conversion)
 - [x] Checks site build for orphan files (not linked to from anywhere)
 - [x] Check for presense of essential meta tags
 - [x] Check that all internal links point to an existing file (`<a>` href, `<img>` src, `<link>`, `<script src>`, `<video>/<audio>` etc.)
   - [ ]	Check for a valid DOCTYPE, unclosed tags, and correct tag pairing.
-  - [ ] Validates that IDs are unique across the page
+  - [x] Validates that IDs are unique across the page
   - [ ] &amp;, &nbsp;, &#39; (unresolved HTML entities bleeding into plain text)
   - [ ] â€™ or Ã© (Mojibake / character encoding failures)
 - [x] Detect custom shortcode-like fragments
@@ -183,6 +185,7 @@ index_pages:
   - " ]( quote glued to link
 
 ## NEXT UP
+- [ ] Improve the CLI output format
 - [ ] Read https://gwern.net/style-guide#terminology-and-notation
 - [ ] Add "markdown syntax found in HTML" lints (should it also catch "almost Markdown"?)
 - [ ] Come up with ideas for `joodalint help` commands

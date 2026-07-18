@@ -10,22 +10,36 @@ import (
 type BuiltFile struct {
 	Path    string
 	URLPath string
+	// Category is the file's size-summary classification, assigned once
+	// by CategoryForPath when the file is loaded.
+	Category SizeCategory
+	Size     int64
+	// GzipSize is the gzipped byte count, computed at load time for
+	// non-skipped text files; 0 for everything else.
+	GzipSize int64
+	// Skipped marks files matched by build_skip: still valid link targets,
+	// but excluded from rules and size accounting.
+	Skipped bool
+}
+
+// isLinked reports whether a built file is reachable: an entry point, a
+// well-known file, or linked to (under any alias) from another page.
+func isLinked(f BuiltFile, ctx *HTMLContext) bool {
+	if isEntryPoint(f.URLPath) || isWellKnown(f.URLPath) {
+		return true
+	}
+	for _, alias := range pageAliases(f.URLPath) {
+		if ctx.LinkedPages[alias] {
+			return true
+		}
+	}
+	return false
 }
 
 func ReportOrphans(files []BuiltFile, ctx *HTMLContext) []Diagnostic {
 	var diags []Diagnostic
 	for _, f := range files {
-		if isEntryPoint(f.URLPath) || isWellKnown(f.URLPath) {
-			continue
-		}
-		linked := false
-		for _, alias := range pageAliases(f.URLPath) {
-			if ctx.LinkedPages[alias] {
-				linked = true
-				break
-			}
-		}
-		if linked {
+		if f.Skipped || isLinked(f, ctx) {
 			continue
 		}
 		diags = append(diags, Diagnostic{
@@ -46,7 +60,14 @@ func isWellKnown(urlPath string) bool {
 	if strings.HasPrefix(base, ".") {
 		return true
 	}
-	if strings.HasPrefix(base, "favicon.") {
+	// The remaining names are excused because browsers and crawlers fetch
+	// them by convention without any markup reference — but that convention
+	// only covers the site root. A copy in a subfolder is never fetched
+	// implicitly, so it goes through the normal orphan check.
+	if path.Dir(urlPath) != "/" {
+		return false
+	}
+	if strings.HasPrefix(base, "favicon.") || strings.HasPrefix(base, "apple-touch-icon") {
 		return true
 	}
 	switch base {
@@ -70,6 +91,11 @@ var cssURLRegex = regexp.MustCompile(`url\(\s*['"]?([^'")\s]+)['"]?\s*\)`)
 func ScanCSSLinks(files []BuiltFile, ctx *HTMLContext) error {
 	for _, f := range files {
 		if !strings.HasSuffix(f.Path, ".css") {
+			continue
+		}
+		// Skipped CSS contributes no outgoing links, matching skipped HTML
+		// (which is never parsed at all).
+		if f.Skipped {
 			continue
 		}
 		b, err := os.ReadFile(f.Path)

@@ -45,7 +45,7 @@ func Markdown(cfg *config.Config) (int, error) {
 	astRules := rules.MarkdownAST()
 	textRules := rules.MarkdownText()
 
-	diags := runParallel(paths, func(p string) []rules.Diagnostic {
+	diags := runFiles(paths, func(p string) []rules.Diagnostic {
 		b, err := os.ReadFile(p)
 		if err != nil {
 			return []rules.Diagnostic{{Path: p, Rule: "io", Message: err.Error()}}
@@ -101,14 +101,14 @@ func Markdown(cfg *config.Config) (int, error) {
 }
 
 func Build(cfg *config.Config, root string) (int, error) {
-	files, allFiles, pages, pageIDs, err := loadHTML(cfg, root)
+	site, err := loadHTML(cfg, root)
 	if err != nil {
 		return 0, err
 	}
-	ctx := &rules.HTMLContext{Root: root, Pages: pages, PageIDs: pageIDs, Config: cfg, LinkedPages: map[string]bool{}}
+	ctx := &rules.HTMLContext{Root: root, Pages: site.pages, PageIDs: site.pageIDs, Config: cfg, LinkedPages: map[string]bool{}}
 
 	rs := rules.HTML()
-	diags := runFiles(files, func(f *rules.HTMLFile) []rules.Diagnostic {
+	diags := runFiles(site.htmlFiles, func(f *rules.HTMLFile) []rules.Diagnostic {
 		var out []rules.Diagnostic
 		for _, r := range rs {
 			out = append(out, r.Check(f, ctx)...)
@@ -116,14 +116,16 @@ func Build(cfg *config.Config, root string) (int, error) {
 		return out
 	})
 
-	if err := rules.ScanCSSLinks(allFiles, ctx); err != nil {
+	if err := rules.ScanCSSLinks(site.allFiles, ctx); err != nil {
 		return 0, err
 	}
-	diags = append(diags, rules.ReportOrphans(allFiles, ctx)...)
+	diags = append(diags, rules.ReportOrphans(site.allFiles, ctx)...)
+	diags = append(diags, rules.ImageDiagnostics(site.allFiles)...)
 
-	rules.ReportJSMetrics(allFiles, ctx, stdoutIsTTY())
+	rules.ReportJSMetrics(site.allFiles, ctx, stdoutIsTTY())
+	rules.ReportSizeSummary(site.allFiles, stdoutIsTTY())
 
-	tidyDiags, err := tidyDiagnostics(root)
+	tidyDiags, err := tidyDiagnostics(site.allFiles)
 	if err != nil {
 		return 0, err
 	}
@@ -133,11 +135,21 @@ func Build(cfg *config.Config, root string) (int, error) {
 	return len(diags), nil
 }
 
-func loadHTML(cfg *config.Config, root string) ([]*rules.HTMLFile, []rules.BuiltFile, map[string]bool, map[string]map[string]int, error) {
-	pages := make(map[string]bool)
-	pageIDs := make(map[string]map[string]int)
-	var files []*rules.HTMLFile
-	var allFiles []rules.BuiltFile
+// builtSite is everything loadHTML gathers from walking the build root:
+// parsed HTML files (rules run against these), every built file with its
+// size, and the page/ID lookup tables link rules resolve against.
+type builtSite struct {
+	htmlFiles []*rules.HTMLFile
+	allFiles  []rules.BuiltFile
+	pages     map[string]bool
+	pageIDs   map[string]map[string]int
+}
+
+func loadHTML(cfg *config.Config, root string) (*builtSite, error) {
+	site := &builtSite{
+		pages:   make(map[string]bool),
+		pageIDs: make(map[string]map[string]int),
+	}
 
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -152,31 +164,46 @@ func loadHTML(cfg *config.Config, root string) ([]*rules.HTMLFile, []rules.Built
 			return err
 		}
 		u := "/" + filepath.ToSlash(rel)
-		pages[u] = true
+		site.pages[u] = true
 		var alts []string
 		if strings.HasSuffix(u, "/index.html") {
 			withSlash := strings.TrimSuffix(u, "index.html")
-			pages[withSlash] = true
-			pages[strings.TrimSuffix(withSlash, "/")] = true
+			site.pages[withSlash] = true
+			site.pages[strings.TrimSuffix(withSlash, "/")] = true
 			alts = []string{withSlash, strings.TrimSuffix(withSlash, "/")}
 		}
 
-		allFiles = append(allFiles, rules.BuiltFile{Path: p, URLPath: urlPathFor(root, p)})
+		var size int64
+		if info, err := d.Info(); err == nil {
+			size = info.Size()
+		}
+		// Skipped files are still registered as valid page/asset targets,
+		// but are excluded from rules and size accounting (no gzip work).
+		skipped := cfg.SkipBuild(root, p)
+		bf := rules.BuiltFile{
+			Path:     p,
+			URLPath:  urlPathFor(root, p),
+			Category: rules.CategoryForPath(p),
+			Size:     size,
+			Skipped:  skipped,
+		}
+		// Text files are read here once: gzip size is computed while the
+		// bytes are in hand, and HTML parsing below reuses the same bytes.
+		var b []byte
+		if !skipped && bf.Category.Gzip() {
+			b, err = os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			bf.GzipSize = rules.GzipSize(b)
+		}
+		site.allFiles = append(site.allFiles, bf)
 
-		if !strings.HasSuffix(p, ".html") {
+		if skipped || !strings.HasSuffix(p, ".html") {
 			return nil
-		}
-		// Skipped files are still registered above as valid page/asset
-		// targets, but we don't run any rules against their contents.
-		if cfg.SkipBuild(root, p) {
-			return nil
-		}
-		b, err := os.ReadFile(p)
-		if err != nil {
-			return err
 		}
 		links, images, assets, ids, text, title, lang, metas, headLinks := parseHTML(b)
-		files = append(files, &rules.HTMLFile{
+		site.htmlFiles = append(site.htmlFiles, &rules.HTMLFile{
 			Path:      p,
 			URLPath:   urlPathFor(root, p),
 			Links:     links,
@@ -189,13 +216,13 @@ func loadHTML(cfg *config.Config, root string) ([]*rules.HTMLFile, []rules.Built
 			Metas:     metas,
 			HeadLinks: headLinks,
 		})
-		pageIDs[u] = ids
+		site.pageIDs[u] = ids
 		for _, alt := range alts {
-			pageIDs[alt] = ids
+			site.pageIDs[alt] = ids
 		}
 		return nil
 	})
-	return files, allFiles, pages, pageIDs, err
+	return site, err
 }
 
 func parseHTML(content []byte) (links, images []string, assets []rules.Asset, ids map[string]int, text, title, lang string, metas []rules.MetaTag, headLinks []rules.HeadLink) {
@@ -375,38 +402,6 @@ func walk(root string, keep func(string, fs.DirEntry) bool) ([]string, error) {
 		return nil
 	})
 	return paths, err
-}
-
-func runParallel(paths []string, fn func(string) []rules.Diagnostic) []rules.Diagnostic {
-	jobs := make(chan string)
-	results := make(chan []rules.Diagnostic)
-
-	var wg sync.WaitGroup
-	workers := runtime.NumCPU()
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for p := range jobs {
-				results <- fn(p)
-			}
-		}()
-	}
-
-	go func() {
-		for _, p := range paths {
-			jobs <- p
-		}
-		close(jobs)
-		wg.Wait()
-		close(results)
-	}()
-
-	var all []rules.Diagnostic
-	for ds := range results {
-		all = append(all, ds...)
-	}
-	return all
 }
 
 func runFiles[T any](items []T, fn func(T) []rules.Diagnostic) []rules.Diagnostic {

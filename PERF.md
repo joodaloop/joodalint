@@ -1,5 +1,10 @@
 # Performance notes
 
+- Three identical rule interfaces: MarkdownRule, MarkdownASTRule, and MarkdownTextRule have byte-for-byte identical signatures, and the runner iterates the three registries with identical loops. The
+split looks organizational, but a single interface with a category tag (or just one registry) would remove ~40 lines of ceremony.
+- ANSI color boilerplate is copied three times (report, ReportJSMetrics, and now my summary follows suit). A tiny shared paint helper package-side would consolidate it.
+- visibleLen in runner.go:534 is just len(s) — either a placeholder for future ANSI-aware width handling or dead indirection.
+
 All numbers below were measured on an Apple M4, single-threaded, on
 2026-05-01 via:
 

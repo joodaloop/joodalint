@@ -2,7 +2,6 @@ package rules
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 )
@@ -16,28 +15,13 @@ type jsFile struct {
 func collectJSFiles(files []BuiltFile, ctx *HTMLContext) []jsFile {
 	var candidates []jsFile
 	for _, f := range files {
-		if !strings.HasSuffix(f.Path, ".js") {
+		if f.Skipped || f.Category != catJS {
 			continue
 		}
-		if isEntryPoint(f.URLPath) || isWellKnown(f.URLPath) {
-			// non-orphaned
-		} else {
-			linked := false
-			for _, alias := range pageAliases(f.URLPath) {
-				if ctx.LinkedPages[alias] {
-					linked = true
-					break
-				}
-			}
-			if !linked {
-				continue
-			}
-		}
-		info, err := os.Stat(f.Path)
-		if err != nil {
+		if !isLinked(f, ctx) {
 			continue
 		}
-		candidates = append(candidates, jsFile{path: f.Path, urlPath: f.URLPath, size: info.Size()})
+		candidates = append(candidates, jsFile{path: f.Path, urlPath: f.URLPath, size: f.Size})
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].size > candidates[j].size

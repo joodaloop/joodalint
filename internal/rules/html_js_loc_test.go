@@ -1,21 +1,14 @@
 package rules
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestCollectJSFiles_OnlyJS(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "foo.js", 100)
-	writeFile(t, dir, "bar.css", 200)
-	writeFile(t, dir, "baz.html", 300)
-
 	files := []BuiltFile{
-		{Path: filepath.Join(dir, "foo.js"), URLPath: "/foo.js"},
-		{Path: filepath.Join(dir, "bar.css"), URLPath: "/bar.css"},
-		{Path: filepath.Join(dir, "baz.html"), URLPath: "/baz.html"},
+		builtFile("/site/public/foo.js", "/foo.js", 100),
+		builtFile("/site/public/bar.css", "/bar.css", 200),
+		builtFile("/site/public/baz.html", "/baz.html", 300),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{"/foo.js": true}}
 
@@ -28,14 +21,25 @@ func TestCollectJSFiles_OnlyJS(t *testing.T) {
 	}
 }
 
-func TestCollectJSFiles_OrphanExcluded(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "linked.js", 100)
-	writeFile(t, dir, "orphan.js", 200)
-
+func TestCollectJSFiles_ModuleExtensionsIncluded(t *testing.T) {
 	files := []BuiltFile{
-		{Path: filepath.Join(dir, "linked.js"), URLPath: "/linked.js"},
-		{Path: filepath.Join(dir, "orphan.js"), URLPath: "/orphan.js"},
+		builtFile("/site/public/mod.mjs", "/mod.mjs", 100),
+		builtFile("/site/public/legacy.cjs", "/legacy.cjs", 200),
+	}
+	ctx := &HTMLContext{LinkedPages: map[string]bool{
+		"/mod.mjs": true, "/legacy.cjs": true,
+	}}
+
+	got := collectJSFiles(files, ctx)
+	if len(got) != 2 {
+		t.Fatalf("want 2 JS files (.mjs/.cjs), got %d", len(got))
+	}
+}
+
+func TestCollectJSFiles_OrphanExcluded(t *testing.T) {
+	files := []BuiltFile{
+		builtFile("/site/public/linked.js", "/linked.js", 100),
+		builtFile("/site/public/orphan.js", "/orphan.js", 200),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{"/linked.js": true}}
 
@@ -49,11 +53,8 @@ func TestCollectJSFiles_OrphanExcluded(t *testing.T) {
 }
 
 func TestCollectJSFiles_WellKnownIncluded(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "sw.js", 50)
-
 	files := []BuiltFile{
-		{Path: filepath.Join(dir, "sw.js"), URLPath: "/sw.js"},
+		builtFile("/site/public/sw.js", "/sw.js", 50),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{}}
 
@@ -67,15 +68,10 @@ func TestCollectJSFiles_WellKnownIncluded(t *testing.T) {
 }
 
 func TestCollectJSFiles_SortedBySize(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "small.js", 100)
-	writeFile(t, dir, "big.js", 500)
-	writeFile(t, dir, "mid.js", 200)
-
 	files := []BuiltFile{
-		{Path: filepath.Join(dir, "small.js"), URLPath: "/small.js"},
-		{Path: filepath.Join(dir, "big.js"), URLPath: "/big.js"},
-		{Path: filepath.Join(dir, "mid.js"), URLPath: "/mid.js"},
+		builtFile("/site/public/small.js", "/small.js", 100),
+		builtFile("/site/public/big.js", "/big.js", 500),
+		builtFile("/site/public/mid.js", "/mid.js", 200),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{
 		"/small.js": true, "/big.js": true, "/mid.js": true,
@@ -98,7 +94,7 @@ func TestCollectJSFiles_SortedBySize(t *testing.T) {
 
 func TestCollectJSFiles_EmptyWhenNoJS(t *testing.T) {
 	files := []BuiltFile{
-		{Path: "/site/public/index.html", URLPath: "/"},
+		builtFile("/site/public/index.html", "/", 0),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{}}
 	got := collectJSFiles(files, ctx)
@@ -108,12 +104,8 @@ func TestCollectJSFiles_EmptyWhenNoJS(t *testing.T) {
 }
 
 func TestCollectJSFiles_LinkedViaAlias(t *testing.T) {
-	dir := t.TempDir()
-	// JS files in subdirs may end with "/" in URLPath, triggering aliases
-	writeFile(t, dir, "robots.txt", 100)
-
 	files := []BuiltFile{
-		{Path: filepath.Join(dir, "robots.txt"), URLPath: "/robots.txt"},
+		builtFile("/site/public/robots.txt", "/robots.txt", 100),
 	}
 	ctx := &HTMLContext{LinkedPages: map[string]bool{}}
 	got := collectJSFiles(files, ctx)
@@ -122,10 +114,18 @@ func TestCollectJSFiles_LinkedViaAlias(t *testing.T) {
 	}
 }
 
-func writeFile(t *testing.T, dir, name string, size int) {
-	t.Helper()
-	content := make([]byte, size)
-	if err := os.WriteFile(filepath.Join(dir, name), content, 0644); err != nil {
-		t.Fatal(err)
+func TestCollectJSFiles_SkippedExcluded(t *testing.T) {
+	skipped := builtFile("/site/public/vendor/big.js", "/vendor/big.js", 900)
+	skipped.Skipped = true
+	files := []BuiltFile{
+		skipped,
+		builtFile("/site/public/app.js", "/app.js", 100),
+	}
+	ctx := &HTMLContext{LinkedPages: map[string]bool{
+		"/vendor/big.js": true, "/app.js": true,
+	}}
+	got := collectJSFiles(files, ctx)
+	if len(got) != 1 || got[0].urlPath != "/app.js" {
+		t.Fatalf("want only non-skipped JS, got %+v", got)
 	}
 }

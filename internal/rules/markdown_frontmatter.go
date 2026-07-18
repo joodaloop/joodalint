@@ -3,6 +3,8 @@ package rules
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"slices"
 	"sort"
 	"time"
 
@@ -237,7 +239,7 @@ func validate(name string, val any, spec config.FieldSpec) string {
 		if !ok {
 			return fmt.Sprintf("field %q: expected enum string, got %s", name, kindOf(val))
 		}
-		if !contains(spec.Values, s) {
+		if !slices.Contains(spec.Values, s) {
 			return fmt.Sprintf("field %q: %q not in allowed values %v", name, s, spec.Values)
 		}
 	case "list":
@@ -265,7 +267,7 @@ func validateItem(name string, i int, val any, spec config.FieldSpec) string {
 		if !ok {
 			return fmt.Sprintf("field %q[%d]: expected enum string, got %s", name, i, kindOf(val))
 		}
-		if !contains(spec.Values, s) {
+		if !slices.Contains(spec.Values, s) {
 			return fmt.Sprintf("field %q[%d]: %q not in allowed values %v", name, i, s, spec.Values)
 		}
 	case "string":
@@ -360,40 +362,14 @@ func parseDate(v any) (time.Time, bool) {
 }
 
 func asFloat(v any) (float64, bool) {
-	switch x := v.(type) {
-	case int:
-		return float64(x), true
-	case int8:
-		return float64(x), true
-	case int16:
-		return float64(x), true
-	case int32:
-		return float64(x), true
-	case int64:
-		return float64(x), true
-	case uint:
-		return float64(x), true
-	case uint8:
-		return float64(x), true
-	case uint16:
-		return float64(x), true
-	case uint32:
-		return float64(x), true
-	case uint64:
-		return float64(x), true
-	case float32:
-		return float64(x), true
-	case float64:
-		return x, true
+	switch rv := reflect.ValueOf(v); rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(rv.Int()), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(rv.Uint()), true
+	case reflect.Float32, reflect.Float64:
+		return rv.Float(), true
 	}
 	return 0, false
 }
 
-func contains(xs []string, s string) bool {
-	for _, x := range xs {
-		if x == s {
-			return true
-		}
-	}
-	return false
-}

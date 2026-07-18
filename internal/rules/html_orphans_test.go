@@ -32,6 +32,9 @@ func TestIsWellKnown(t *testing.T) {
 		{"/.hidden", true},
 		{"/favicon.ico", true},
 		{"/favicon.png", true},
+		{"/apple-touch-icon.png", true},
+		{"/apple-touch-icon-precomposed.png", true},
+		{"/apple-touch-icon-120x120.png", true},
 		{"/404.html", true},
 		{"/robots.txt", true},
 		{"/sitemap.xml", true},
@@ -39,6 +42,13 @@ func TestIsWellKnown(t *testing.T) {
 		{"/manifest.json", true},
 		{"/foo.html", false},
 		{"/bar", false},
+		// Convention names are only excused at the site root.
+		{"/old/favicon.ico", false},
+		{"/assets/apple-touch-icon.png", false},
+		{"/backup/404.html", false},
+		{"/vendor/sw.js", false},
+		// Dotfiles stay excused at any depth.
+		{"/notes/.hidden", true},
 	}
 	for _, tc := range cases {
 		if got := isWellKnown(tc.in); got != tc.want {
@@ -110,5 +120,19 @@ func TestReportOrphans_UnlinkedIsOrphaned(t *testing.T) {
 	diags := ReportOrphans(files, ctx)
 	if !containsMsg(diags, "is not linked to") {
 		t.Fatalf("want orphan-file diag, got %v", messages(diags))
+	}
+}
+
+func TestReportOrphans_SkippedNotReported(t *testing.T) {
+	skipped := builtFile("/site/public/vendor/lib.css", "/vendor/lib.css", 100)
+	skipped.Skipped = true
+	files := []BuiltFile{
+		skipped,
+		builtFile("/site/public/unlinked.css", "/unlinked.css", 100),
+	}
+	ctx := &HTMLContext{LinkedPages: map[string]bool{}}
+	diags := ReportOrphans(files, ctx)
+	if len(diags) != 1 || diags[0].Path != "/site/public/unlinked.css" {
+		t.Fatalf("want only the non-skipped orphan, got %v", diags)
 	}
 }

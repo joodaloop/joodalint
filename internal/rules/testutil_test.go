@@ -73,3 +73,8 @@ func assertNoDiags(t *testing.T, diags []Diagnostic) {
 		t.Fatalf("expected no diagnostics, got %d: %v", len(diags), messages(diags))
 	}
 }
+
+// builtFile builds a BuiltFile classified the way the runner builds them.
+func builtFile(p, url string, size int64) BuiltFile {
+	return BuiltFile{Path: p, URLPath: url, Size: size, Category: CategoryForPath(p)}
+}
