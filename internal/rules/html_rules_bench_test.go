@@ -117,13 +117,13 @@ func BenchmarkHTMLRules(b *testing.B) {
 func BenchmarkReportOrphans(b *testing.B) {
 	ctx := benchHTMLContext(100)
 	files := make([]BuiltFile, 0, 401)
-	files = append(files, BuiltFile{Path: "public/index.html", URLPath: "/"})
+	files = append(files, builtFile("public/index.html", "/", 0))
 	for i := 0; i < 100; i++ {
 		files = append(files,
-			BuiltFile{Path: fmt.Sprintf("public/page/%d/index.html", i), URLPath: fmt.Sprintf("/page/%d/", i)},
-			BuiltFile{Path: fmt.Sprintf("public/img/%d.png", i), URLPath: fmt.Sprintf("/img/%d.png", i)},
-			BuiltFile{Path: fmt.Sprintf("public/js/%d.js", i), URLPath: fmt.Sprintf("/js/%d.js", i)},
-			BuiltFile{Path: fmt.Sprintf("public/css/%d.css", i), URLPath: fmt.Sprintf("/css/%d.css", i)},
+			builtFile(fmt.Sprintf("public/page/%d/index.html", i), fmt.Sprintf("/page/%d/", i), 0),
+			builtFile(fmt.Sprintf("public/img/%d.png", i), fmt.Sprintf("/img/%d.png", i), 0),
+			builtFile(fmt.Sprintf("public/js/%d.js", i), fmt.Sprintf("/js/%d.js", i), 0),
+			builtFile(fmt.Sprintf("public/css/%d.css", i), fmt.Sprintf("/css/%d.css", i), 0),
 		)
 		ctx.LinkedPages[fmt.Sprintf("/page/%d/", i)] = true
 		ctx.LinkedPages[fmt.Sprintf("/img/%d.png", i)] = true
@@ -150,7 +150,7 @@ func BenchmarkScanCSSLinks(b *testing.B) {
 		if err := os.WriteFile(path, []byte(css.String()), 0o644); err != nil {
 			b.Fatal(err)
 		}
-		files = append(files, BuiltFile{Path: path, URLPath: fmt.Sprintf("/css/site-%02d.css", i)})
+		files = append(files, builtFile(path, fmt.Sprintf("/css/site-%02d.css", i), 0))
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

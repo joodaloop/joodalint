@@ -72,7 +72,7 @@ index_pages:
 
 ### Build lints (`joodalint build`)
 - [x] Throw a warning on excessive Javascript
-- [x] Build size summary (bytes and file count per category — HTML, CSS, JS, JSON, XML, images, fonts, video, audio, PDF, wasm, other — with real gzipped sizes for the text formats)
+- [x] Build size summary (bytes and file count per category — HTML, CSS, JS, JSON, XML, images, SVG, fonts, video, audio, PDF, wasm, other — with real gzipped sizes for the text formats and an estimated transfer total)
 - [x] Flag large images (>500KB) and PNGs (with an estimated size for lossless webp conversion)
 - [x] Checks site build for orphan files (not linked to from anywhere)
 - [x] Check for presense of essential meta tags

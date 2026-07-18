@@ -199,7 +199,7 @@ func loadHTML(cfg *config.Config, root string) (*builtSite, error) {
 		}
 		site.allFiles = append(site.allFiles, bf)
 
-		if skipped || !strings.HasSuffix(p, ".html") {
+		if skipped || !bf.IsHTML() {
 			return nil
 		}
 		links, images, assets, ids, text, title, lang, metas, headLinks := parseHTML(b)

@@ -28,7 +28,7 @@ func tidyDiagnostics(files []rules.BuiltFile) ([]rules.Diagnostic, error) {
 
 	var paths []string
 	for _, f := range files {
-		if f.Skipped || !strings.HasSuffix(f.Path, ".html") {
+		if f.Skipped || !f.IsHTML() {
 			continue
 		}
 		paths = append(paths, f.Path)

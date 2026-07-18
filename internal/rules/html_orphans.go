@@ -22,6 +22,12 @@ type BuiltFile struct {
 	Skipped bool
 }
 
+// IsHTML reports whether the file is classified as an HTML page.
+func (f BuiltFile) IsHTML() bool { return f.Category == catHTML }
+
+// IsCSS reports whether the file is classified as a stylesheet.
+func (f BuiltFile) IsCSS() bool { return f.Category == catCSS }
+
 // isLinked reports whether a built file is reachable: an entry point, a
 // well-known file, or linked to (under any alias) from another page.
 func isLinked(f BuiltFile, ctx *HTMLContext) bool {
@@ -90,12 +96,9 @@ var cssURLRegex = regexp.MustCompile(`url\(\s*['"]?([^'")\s]+)['"]?\s*\)`)
 
 func ScanCSSLinks(files []BuiltFile, ctx *HTMLContext) error {
 	for _, f := range files {
-		if !strings.HasSuffix(f.Path, ".css") {
-			continue
-		}
 		// Skipped CSS contributes no outgoing links, matching skipped HTML
 		// (which is never parsed at all).
-		if f.Skipped {
+		if f.Skipped || !f.IsCSS() {
 			continue
 		}
 		b, err := os.ReadFile(f.Path)

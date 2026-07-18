@@ -97,8 +97,8 @@ func TestFormatSize(t *testing.T) {
 }
 
 func TestImageCategory(t *testing.T) {
-	yes := []string{"a.png", "b.JPG", "images/c.webp", "d.svg", "e.avif"}
-	no := []string{"a.js", "b.html", "c.json", "d.css", "noext"}
+	yes := []string{"a.png", "b.JPG", "images/c.webp", "e.avif"}
+	no := []string{"a.js", "b.html", "c.json", "d.css", "noext", "d.svg"}
 	for _, p := range yes {
 		if CategoryForPath(p) != catImages {
 			t.Errorf("CategoryForPath(%q) != catImages, want images", p)
@@ -108,6 +108,19 @@ func TestImageCategory(t *testing.T) {
 		if CategoryForPath(p) == catImages {
 			t.Errorf("CategoryForPath(%q) == catImages, want other category", p)
 		}
+	}
+	if CategoryForPath("d.svg") != catSVG {
+		t.Error(`CategoryForPath("d.svg") != catSVG`)
+	}
+}
+
+func TestImageDiagnostics_LargeSVGFlagged(t *testing.T) {
+	files := []BuiltFile{
+		builtFile("/site/public/images/diagram.svg", "/images/diagram.svg", 600*1024),
+	}
+	diags := ImageDiagnostics(files)
+	if len(diags) != 1 || diags[0].Rule != "image-size" {
+		t.Fatalf("want 1 image-size diag for large SVG, got %v", messages(diags))
 	}
 }
 
@@ -120,7 +133,7 @@ func TestGzipSize(t *testing.T) {
 }
 
 func TestCategoryGzip(t *testing.T) {
-	yes := []string{"index.html", "app.js", "mod.mjs", "data.json", "style.css", "feed.xml", "robots.txt", "site.webmanifest"}
+	yes := []string{"index.html", "app.js", "mod.mjs", "data.json", "style.css", "feed.xml", "robots.txt", "site.webmanifest", "icon.svg"}
 	no := []string{"photo.png", "font.woff2", "clip.mp4", "doc.pdf", "mystery.bin"}
 	for _, p := range yes {
 		if !CategoryForPath(p).Gzip() {

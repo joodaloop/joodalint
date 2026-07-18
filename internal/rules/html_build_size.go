@@ -21,7 +21,11 @@ var sizeCategories = []struct {
 	{"json", true, []string{".json", ".webmanifest", ".map"}},
 	{"xml", true, []string{".xml", ".rss", ".atom"}},
 	{"txt", true, []string{".txt"}},
-	{"images", false, []string{".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif", ".ico", ".bmp", ".tiff"}},
+	{"images", false, []string{".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".ico", ".bmp", ".tiff"}},
+	// SVG is kept out of images: it's a text format that servers gzip, so
+	// it needs its own row for the gzip column and transfer estimate to
+	// stay honest. Size diagnostics still treat it as an image.
+	{"svg", true, []string{".svg"}},
 	{"fonts", false, []string{".woff", ".woff2", ".ttf", ".otf", ".eot"}},
 	{"video", false, []string{".mp4", ".webm", ".mov", ".m4v", ".ogv"}},
 	{"audio", false, []string{".mp3", ".ogg", ".oga", ".wav", ".m4a", ".aac", ".flac", ".opus"}},
@@ -29,13 +33,15 @@ var sizeCategories = []struct {
 	{"wasm", false, []string{".wasm"}},
 }
 
-// SizeCategory is an index into sizeCategories, assigned once per built
-// file at load time; consumers compare against it instead of re-matching
-// extensions.
+// SizeCategory identifies a sizeCategories entry (stored as index+1),
+// assigned once per built file at load time; consumers compare against it
+// instead of re-matching extensions. The zero value is otherCategory, so
+// a BuiltFile nobody classified lands in the catch-all bucket rather than
+// silently passing for the first table entry.
 type SizeCategory uint8
 
 // otherCategory marks files whose extension matches no category.
-const otherCategory SizeCategory = 255
+const otherCategory SizeCategory = 0
 
 // extCategory maps a lowercased extension to its index in sizeCategories.
 var extCategory = func() map[string]int {
@@ -49,14 +55,17 @@ var extCategory = func() map[string]int {
 }()
 
 var (
+	catHTML   = mustCategory("html")
+	catCSS    = mustCategory("css")
 	catJS     = mustCategory("js")
 	catImages = mustCategory("images")
+	catSVG    = mustCategory("svg")
 )
 
 func mustCategory(name string) SizeCategory {
 	for i, c := range sizeCategories {
 		if c.name == name {
-			return SizeCategory(i)
+			return SizeCategory(i + 1)
 		}
 	}
 	panic("unknown size category " + name)
@@ -65,15 +74,18 @@ func mustCategory(name string) SizeCategory {
 // CategoryForPath classifies a built file by its extension.
 func CategoryForPath(p string) SizeCategory {
 	if i, ok := extCategory[strings.ToLower(path.Ext(p))]; ok {
-		return SizeCategory(i)
+		return SizeCategory(i + 1)
 	}
 	return otherCategory
 }
 
+// tableIndex returns the sizeCategories index, or -1 for otherCategory.
+func (c SizeCategory) tableIndex() int { return int(c) - 1 }
+
 // Gzip reports whether the category is a text format whose gzipped size
 // is tracked (already-compressed media is left alone).
 func (c SizeCategory) Gzip() bool {
-	return int(c) < len(sizeCategories) && sizeCategories[c].gzip
+	return c != otherCategory && sizeCategories[c.tableIndex()].gzip
 }
 
 func formatSize(n int64) string {
@@ -116,8 +128,8 @@ func ReportSizeSummary(files []BuiltFile, color bool) {
 		if f.Skipped {
 			continue
 		}
-		i := int(f.Category)
-		if i > other {
+		i := f.Category.tableIndex()
+		if i < 0 {
 			i = other
 		}
 		sizes[i] += f.Size
@@ -193,7 +205,7 @@ const webpLosslessRatio = 0.74
 func ImageDiagnostics(files []BuiltFile) []Diagnostic {
 	var diags []Diagnostic
 	for _, f := range files {
-		if f.Skipped || f.Category != catImages {
+		if f.Skipped || (f.Category != catImages && f.Category != catSVG) {
 			continue
 		}
 		if f.Size > largeImageBytes {
