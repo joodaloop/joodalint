@@ -17,6 +17,13 @@ type htmlArtifacts struct{}
 
 func (htmlArtifacts) ID() string { return "rendered-artifacts" }
 
+// literalPattern is a substring needle reported verbatim. The prose rules
+// use taggedPattern instead, which carries the rule tag to report under.
+type literalPattern struct {
+	needle string
+	msg    string
+}
+
 var renderedArtifactPatterns = []literalPattern{
 	// Unparsed Markdown link/image delimiters leaking as literal text.
 	{"(http", "leaked '(http' — likely broken link delimiter"},

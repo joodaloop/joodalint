@@ -15,35 +15,42 @@ func init() {
 // markdownProseHygiene because those defects are precisely the cases where
 // the AST won't surface the construct the author was trying to write.
 //
-// Diagnostics are emitted under the "prose-hygiene" rule ID so consumers
-// see one rule, not two.
+// Diagnostics are tagged by the kind of defect they describe — quotes,
+// spacing, emphasis, typography, number-format, repeated-word — not by
+// which of the two implementations found them, so a tag means the same
+// thing regardless of whether the check is line-based or AST-based.
+// These tags are the user-facing names checks can be disabled by; treat
+// renaming one as a breaking change.
 type markdownProseHygieneAST struct{}
 
 func (markdownProseHygieneAST) ID() string { return "prose-hygiene" }
 
-// astLiteralPattern is a substring needle the rule reports verbatim.
-type astLiteralPattern struct {
+// taggedPattern is a substring needle reported verbatim under a specific
+// rule tag. Shared by both halves of the prose checks; the HTML rules use
+// the untagged literalPattern instead.
+type taggedPattern struct {
 	needle string
+	rule   string
 	msg    string
 }
 
-var astLiteralPatterns = []astLiteralPattern{
-	{"——", "double em dash"},
-	{"---", "literal triple hyphen (use em dash —)"},
-	{"''", "double apostrophe"},
-	{"``", "double backtick"},
-	{"“", "opening smart quote"},
-	{"”", "closing smart quote"},
-	{",,", "double comma"},
-	{" )", "space before closing paren"},
-	{"( ", "space after opening paren"},
-	{" ,", "space before comma"},
-	{" . ", "space around period"},
-	{" ?", "space before question mark"},
-	{"**", "unescaped bold markers (**)"},
-	{"~~", "unescaped strikethrough markers"},
-	{"==", "unescaped highlight markers (==)"},
-	{"__", "unescaped emphasis markers (__)"},
+var astLiteralPatterns = []taggedPattern{
+	{"——", "typography", "double em dash"},
+	{"---", "typography", "literal triple hyphen (use em dash —)"},
+	{"''", "quotes", "double apostrophe"},
+	{"``", "emphasis", "double backtick"},
+	{"“", "quotes", "opening smart quote"},
+	{"”", "quotes", "closing smart quote"},
+	{",,", "spacing", "double comma"},
+	{" )", "spacing", "space before closing paren"},
+	{"( ", "spacing", "space after opening paren"},
+	{" ,", "spacing", "space before comma"},
+	{" . ", "spacing", "space around period"},
+	{" ?", "spacing", "space before question mark"},
+	{"**", "emphasis", "unescaped bold markers (**)"},
+	{"~~", "emphasis", "unescaped strikethrough markers"},
+	{"==", "emphasis", "unescaped highlight markers (==)"},
+	{"__", "emphasis", "unescaped emphasis markers (__)"},
 }
 
 func (markdownProseHygieneAST) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
@@ -158,9 +165,9 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 	masked := maskBareURLs(bt.text)
 	var diags []Diagnostic
 
-	emit := func(pos int, msg string) {
+	emit := func(pos int, rule, msg string) {
 		diags = append(diags, Diagnostic{
-			Path: f.Path, Line: f.LineAt(bt.bodyOff(pos)), Rule: "prose-hygiene",
+			Path: f.Path, Line: f.LineAt(bt.bodyOff(pos)), Rule: rule,
 			Message: msg,
 		})
 	}
@@ -183,12 +190,12 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 		if a == "had" || a == "that" {
 			continue
 		}
-		emit(idx[i][0], fmt.Sprintf("repeated word: %q", a+" "+a))
+		emit(idx[i][0], "repeated-word", fmt.Sprintf("repeated word: %q", a+" "+a))
 	}
 
 	// Cross-span / URL-sensitive regex checks.
 	if loc := spacedEmph.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "spaces inside emphasis markers (* text *)")
+		emit(loc[0], "emphasis", "spaces inside emphasis markers (* text *)")
 	}
 	if strings.Contains(masked, "_") {
 		// underscoreEmph requires whitespace before the opening marker;
@@ -199,25 +206,25 @@ func proseBlockChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 			if pos < 0 {
 				pos = 0
 			}
-			emit(pos, "underscore emphasis (use * instead)")
+			emit(pos, "emphasis", "underscore emphasis (use * instead)")
 		}
 	}
 	if loc := asymSlash.FindStringIndex(masked); loc != nil {
 		if !strings.HasPrefix(masked[loc[0]:loc[1]], "w/") {
-			emit(loc[0], "asymmetrical spacing around /")
+			emit(loc[0], "spacing", "asymmetrical spacing around /")
 		}
 	}
 	if loc := asymHyphen.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "asymmetrical spacing around hyphen")
+		emit(loc[0], "spacing", "asymmetrical spacing around hyphen")
 	}
 	if loc := hyphenMinus.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "hyphen used as minus sign (use −)")
+		emit(loc[0], "number-format", "hyphen used as minus sign (use −)")
 	}
 	if loc := hyphenRange.FindStringIndex(masked); loc != nil {
-		emit(loc[0], "hyphen in numeric range (use en dash –)")
+		emit(loc[0], "number-format", "hyphen in numeric range (use en dash –)")
 	}
 	if strings.Contains(masked, " !") {
-		emit(strings.Index(masked, " !"), "space before ! mark")
+		emit(strings.Index(masked, " !"), "spacing", "space before ! mark")
 	}
 	return diags
 }
@@ -232,44 +239,44 @@ func proseSpanChecks(f *MarkdownFile, sp ProseSpan) []Diagnostic {
 	}
 	var diags []Diagnostic
 
-	emit := func(msg string) {
+	emit := func(rule, msg string) {
 		diags = append(diags, Diagnostic{
-			Path: f.Path, Line: f.LineAt(sp.Offset), Rule: "prose-hygiene",
+			Path: f.Path, Line: f.LineAt(sp.Offset), Rule: rule,
 			Message: msg,
 		})
 	}
 
 	for _, p := range astLiteralPatterns {
 		if strings.Contains(text, p.needle) {
-			emit(fmt.Sprintf("%s: %q", p.msg, p.needle))
+			emit(p.rule, fmt.Sprintf("%s: %q", p.msg, p.needle))
 		}
 	}
 
 	if strings.Contains(text, " : ") && spacedColon.MatchString(text) {
-		emit("spaced colon ( : )")
+		emit("spacing", "spaced colon ( : )")
 	}
 	if strings.ContainsAny(text, "—–") && mixedDashes.MatchString(text) {
-		emit("malformed dash sequence (mixed em/en or 3+ dashes)")
+		emit("typography", "malformed dash sequence (mixed em/en or 3+ dashes)")
 	}
 	if strings.Contains(text, "+-") || strings.Contains(text, "-+") {
 		if plusMinus.MatchString(text) {
-			emit("malformed plus-minus (use ±)")
+			emit("typography", "malformed plus-minus (use ±)")
 		}
 	}
 	if strings.Contains(text, " %") && spacedPercent.MatchString(text) {
-		emit("space before percent sign (10 %)")
+		emit("number-format", "space before percent sign (10 %)")
 	}
 	if strings.ContainsAny(text, "$£€¥") && spacedCurrency.MatchString(text) {
-		emit("space between currency symbol and number ($ 100)")
+		emit("number-format", "space between currency symbol and number ($ 100)")
 	}
 	if strings.Contains(text, "#") && spacedHash.MatchString(text) {
-		emit("space after # before number (# 1, prefer #1)")
+		emit("number-format", "space after # before number (# 1, prefer #1)")
 	}
 	if strings.ContainsAny(text, "–-") && spacedDashNum.MatchString(text) {
-		emit("space between hyphen/en-dash and number ( – 10)")
+		emit("number-format", "space between hyphen/en-dash and number ( – 10)")
 	}
 	if missingSpacePunct.MatchString(maskBareURLs(text)) {
-		emit("missing space after punctuation")
+		emit("spacing", "missing space after punctuation")
 	}
 	return diags
 }
@@ -294,19 +301,19 @@ func proseQuoteChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 	if strings.Contains(rawText, "\"") {
 		if spacesAroundQuote.MatchString(rawText) {
 			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "prose-hygiene",
+				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "quotes",
 				Message: `spaces around quote ( " )`,
 			})
 		}
 		if orphanedQuote.MatchString(rawText) {
 			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "prose-hygiene",
+				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "quotes",
 				Message: "orphaned quote",
 			})
 		}
 		if paddedQuote.MatchString(rawText) {
 			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "prose-hygiene",
+				Path: f.Path, Line: f.LineAt(blk.Spans[0].Offset), Rule: "quotes",
 				Message: `padded spaces inside quotation marks (" word ")`,
 			})
 		}
@@ -333,7 +340,7 @@ func proseQuoteChecks(f *MarkdownFile, blk ProseBlock) []Diagnostic {
 	}
 	if quoteOpen {
 		diags = append(diags, Diagnostic{
-			Path: f.Path, Line: f.LineAt(quoteOffset), Rule: "prose-hygiene",
+			Path: f.Path, Line: f.LineAt(quoteOffset), Rule: "quotes",
 			Message: `unbalanced '"' (odd count)`,
 		})
 	}

@@ -30,7 +30,7 @@ func Help(cfg *config.Config) error {
 		if d.IsDir() {
 			return true
 		}
-		return strings.HasSuffix(path, ".md")
+		return config.IsMarkdownPath(path)
 	})
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func Help(cfg *config.Config) error {
 			}
 			return true
 		}
-		return strings.HasSuffix(path, ".md")
+		return config.IsMarkdownPath(path)
 	})
 	if err != nil {
 		return err

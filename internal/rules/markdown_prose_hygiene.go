@@ -81,24 +81,22 @@ func nameC1Control(r rune) (string, bool) {
 	return fmt.Sprintf("C1 control character (U+%04X, likely Windows-1252 mojibake)", r), true
 }
 
-type literalPattern struct {
-	needle string
-	msg    string
-}
-
 // literalPatterns covers structural/source-level needles that must be
 // scanned line-by-line: link/HR syntax that the AST won't expose as a
 // "broken" version of the construct, plus the brittle setext header
 // marker. Content-level needles (e.g. " ,", "——") live in
 // markdown_prose_ast.go and run against ProseBlock spans.
-var literalPatterns = []literalPattern{
-	{"](//", "protocol-relative link"},
-	{` " ](`, "quote glued to link"},
-	{`===`, "Setext headers, brittle"},
+var literalPatterns = []taggedPattern{
+	{"](//", "link-style", "protocol-relative link"},
+	{` " ](`, "link-style", "quote glued to link"},
+	{`===`, "md-syntax", "Setext headers, brittle"},
 }
 
 func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 	var diags []Diagnostic
+	emit := func(line int, rule, msg string) {
+		diags = append(diags, Diagnostic{Path: f.Path, Line: line, Rule: rule, Message: msg})
+	}
 	scanner := bufio.NewScanner(bytes.NewReader(f.Body))
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
@@ -144,10 +142,10 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		runes := []rune(text)
 		for i, r := range runes {
 			name, ok := invisibleChars[r]
-				if !ok {
-					name, ok = nameC1Control(r)
-				}
-				if ok {
+			if !ok {
+				name, ok = nameC1Control(r)
+			}
+			if ok {
 				// U+200D is used legitimately in emoji ZWJ sequences
 				// (e.g. 👨‍💻). Only flag it when not between emoji-like
 				// codepoints.
@@ -155,10 +153,7 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 					runes[i-1] > 0x7F && runes[i+1] > 0x7F {
 					continue
 				}
-				diags = append(diags, Diagnostic{
-					Path: f.Path, Line: line, Rule: "prose-hygiene",
-					Message: fmt.Sprintf("invisible character: %s", name),
-				})
+				emit(line, "invisible-chars", fmt.Sprintf("invisible character: %s", name))
 				break
 			}
 		}
@@ -166,74 +161,41 @@ func (markdownProseHygiene) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnos
 		// Literal substring patterns (structural needles only).
 		for _, p := range literalPatterns {
 			if strings.Contains(text, p.needle) {
-				diags = append(diags, Diagnostic{
-					Path: f.Path, Line: line, Rule: "prose-hygiene",
-					Message: fmt.Sprintf("%s: %q", p.msg, p.needle),
-				})
+				emit(line, p.rule, fmt.Sprintf("%s: %q", p.msg, p.needle))
 			}
 		}
 
 		// Hugo shortcode spacing — keep line-based; applies uniformly.
 		if strings.Contains(text, "{{") && (shortcodeOpen.MatchString(text) || shortcodeClose.MatchString(text)) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "Hugo shortcode missing required spaces ({{< name >}})",
-			})
+			emit(line, "shortcode", "Hugo shortcode missing required spaces ({{< name >}})")
 		}
 		if strings.ContainsAny(text, "([") && reversedLink.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "reversed link syntax (use [text](url))",
-			})
+			emit(line, "link-style", "reversed link syntax (use [text](url))")
 		}
 		if strings.Count(text, "[") >= 2 && referenceLink.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "Avoid using reference links (use [text](url))",
-			})
+			emit(line, "link-style", "Avoid using reference links (use [text](url))")
 		}
 		if len(text) > 0 && strings.ContainsAny(text[:min(4, len(text))], "-+*") &&
 			bulletNoSpace.MatchString(text) && !emphasisLine.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "list bullet without space after marker",
-			})
+			emit(line, "md-syntax", "list bullet without space after marker")
 		}
 		if strings.Contains(text, ">") && blockquoteNoSp.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "blockquote > without space after",
-			})
+			emit(line, "md-syntax", "blockquote > without space after")
 		}
 		if len(text) > 0 && (text[0] == ' ' || text[0] == '\t') && strings.Contains(text, "#") && headingIndented.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "heading must start at the beginning of the line",
-			})
+			emit(line, "md-syntax", "heading must start at the beginning of the line")
 		}
 		if strings.HasPrefix(text, "#") && headingNoSpace.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "missing space after # in heading",
-			})
+			emit(line, "md-syntax", "missing space after # in heading")
 		}
 		if strings.Contains(text, "--") && brokenHRDouble.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "broken horizontal rule (use --- not --)",
-			})
+			emit(line, "md-syntax", "broken horizontal rule (use --- not --)")
 		}
 		if len(text) > 0 && (text[0] == ' ' || text[0] == '\t') && strings.ContainsAny(text, "-+*") && oddListIndent.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "odd indentation before list marker",
-			})
+			emit(line, "md-syntax", "odd indentation before list marker")
 		}
 		if strings.Contains(text, "'") && strings.Contains(text, "\"") && straightPrimes.MatchString(text) {
-			diags = append(diags, Diagnostic{
-				Path: f.Path, Line: line, Rule: "prose-hygiene",
-				Message: "straight quotes for feet/inches (use ′ ″)",
-			})
+			emit(line, "quotes", "straight quotes for feet/inches (use ′ ″)")
 		}
 	}
 	return diags

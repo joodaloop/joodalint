@@ -2,7 +2,7 @@
 the sanest linter in the world
 
 ## CONFIGURATION
-Put this in the folder from where you run `joodalint md` (Markdown prose lint), `joodalint build` (site build output checks), or `joodaloop help` (general website assistance).
+Put this in the folder from where you run `joodalint md` (Markdown prose lint), `joodalint build` (site build output checks), or `joodalint help` (general website assistance).
 
 (Note: You don't have to specify a title in your schemas, our linting requires *all* your pages have one)
 
@@ -23,6 +23,12 @@ links:
 
 spelling:
   dict: ./spelling-dict.txt # your spellcheck dictionary, one word per line
+
+rules:
+  disable: [typography, number-format] # checks to turn off, globally
+  # Names are the tags in the middle column of lint output, so you can copy
+  # one straight from a message you want to stop seeing. Names that don't
+  # match a rule are ignored, so a typo means the check keeps running.
   
 # frontmatter schema for each section of your site
 sections:
@@ -53,6 +59,47 @@ index_pages:
   root:
     type: { type: enum, values: [list] }
 ```
+
+## TURNING OFF CHECKS
+
+To stop running a lint rule, copy its tag into `rules.disable`:
+
+```yaml
+rules:
+  disable: [typography, quotes]
+```
+
+### Available tags
+
+| Tag | What it covers |
+|---|---|
+| `invisible-chars` | Zero-width characters, BOMs, Windows-1252 mojibake |
+| `md-syntax` | Broken markdown: bullet/blockquote/heading spacing, horizontal rules, setext headers |
+| `emphasis` | `* text *`, `_underscore_`, unescaped `**` `~~` `==` `__` |
+| `link-style` | Reference links, reversed `()[]` syntax, protocol-relative links |
+| `shortcode` | `{{<shortcode>}}` missing its required spaces |
+| `repeated-word` | "the the" |
+| `spacing` | Space before comma/period/paren, spaced colon, asymmetric `/` and `-` |
+| `quotes` | Orphaned, padded, unbalanced, smart quotes, `5'9"` primes |
+| `typography` | Em/en dash misuse, malformed plus-minus |
+| `number-format` | Currency and percent spacing, hyphen as minus, numeric ranges |
+| `balance` | Unmatched brackets, parens, braces |
+| `formatting` | Suspiciously long emphasis or code spans |
+| `headings` | H1s, headings deeper than h4 |
+| `frontmatter` | Schema violations |
+| `spelling` | Spellcheck against your dictionary |
+| `image-alt` | Missing or meaningless alt text |
+
+URL checks are individually tagged: `empty-url`, `http-url`, `link-host`,
+`link-punctuation`, `long-link-text`, `malformed-scheme-separator`,
+`protocol-relative-url`, `relative-link`, `scheme-missing-colon`,
+`site-local-url`, `spaces-around-link`, `unknown-scheme`, `url-chars`.
+
+Build checks (`joodalint build`): `asset-src-exists`, `duplicate-id`,
+`fragment-link-exists`, `head-metadata`, `image-format`, `image-size`,
+`image-src-exists`, `orphan-file`, `relative-link-exists`,
+`rendered-artifacts`.
+
 
 ## WHAT DOES IT DO?
 
@@ -207,3 +254,120 @@ index_pages:
   - [ ] css-extension should be a list of known page classes, not a free string.
 - [ ] Symbols next to other symbols
   - [ ] > is ?
+
+## KNOWN ISSUES
+
+### MDX: escaped delimiters are masked anyway
+`\{` and `\<` are the MDX escapes for literal delimiters, but `MaskMDX`
+dispatches on `{` and `<` without checking for a preceding backslash, so
+escaped content is painted over and never linted:
+
+```
+in:   Use \{bad  prose ?} here.
+out:  Use \               here.
+```
+
+The double space and the space before `?` would both normally be flagged.
+Fix: count consecutive preceding backslashes and skip masking when the
+count is odd. Note `\\{` is an escaped backslash followed by a real
+delimiter and must still mask, so a simple `b[i-1] == '\\'` test is wrong.
+
+### MDX: four-space indentation is treated as code
+MDX deliberately disables indented code blocks so that components can be
+indented freely ([mdx-js/mdx#993](https://github.com/mdx-js/mdx/issues/993)).
+Markdown nested inside a component may therefore legally start at four or
+more spaces. Masking preserves that indentation and hands it to goldmark,
+which is a CommonMark parser and classifies those lines as code — so they
+are silently dropped from prose checks. The line-based pass separately
+flags such headings via `headingIndented`, which is also wrong for MDX.
+
+Do **not** fix this by dedenting: indentation still carries meaning for
+nested lists and blockquotes in MDX, and flattening every line to three
+spaces would collapse nested lists into siblings. The correct fix is to
+build the MDX parser without goldmark's indented-code block parser
+(`parser.WithBlockParsers`, the default set minus `NewCodeBlockParser()`),
+leaving every other block parser intact, and to gate `headingIndented` on
+an `IsMDX` flag.
+
+### MDX page bundles report false relative-link errors
+`isBundleIndex` in `markdown_urls.go` matches only `index.md` and
+`_index.md`, so `index.mdx` / `_index.mdx` bundles fail the check and their
+valid sibling resource links are reported as `relative-link`. Fix by
+comparing the extension-stripped stem and reusing `config.IsMarkdownPath`,
+so it can't drift from the same fix already applied to `SchemaFor`.
+
+### Two alt-text tags are undocumented
+`empty-image-alt` and `empty-link-text` are emitted from
+`markdown_urls.go` but appear nowhere in the tag list above, so users can
+see them in output and fail to disable them. `image-alt` should also be
+described as covering generic or meaningless alt text rather than missing
+alt text.
+
+These were missed because the tag list was verified by grepping for
+`Rule: "literal"`, and both are assigned to a variable before use. Any
+future audit should collect `d.Rule` from real rule output instead of
+matching on source shape.
+
+### Empty headings report the wrong line
+A heading with no inline content (`# ` on its own) is reported at the first
+line of the body instead of its real line. With 3-line frontmatter an empty
+`#` on line 284 reports as line 4; with 6-line frontmatter it reports as 7.
+Non-empty headings in the same position are correct.
+
+Cause: goldmark records **no** line segments for an empty ATX heading
+(`h.Lines().Len() == 0`) and it has no text child, so `NodeLine` falls
+through both lookups to its `return f.BodyStartLine` fallback. The position
+isn't being miscalculated — it was never in the AST to begin with.
+
+So "read the heading node's own position" is not a fix; there is nothing to
+read. Recovering the position from the previous sibling doesn't work either:
+two empty headings in a row both resolve to the same line, because the
+second one's previous sibling is also position-less.
+
+Planned fix: `ast.Walk` visits nodes in document order, so the heading rule
+can carry a running byte offset — use a node's real position when it has
+one, and when it doesn't, scan `Body` forward from that mark for the next
+`^ {0,3}#{1,6}[ \t]*$` line, then advance the mark past it. Consecutive
+empty headings then resolve correctly. The scan needs the same fenced-code
+tracking the line-based pass already does, or a `#` inside a code fence can
+be mistaken for the heading.
+
+### MDX support is unvalidated against real content
+`MaskMDX` has unit tests and one end-to-end fixture, but both cover only
+the constructs that were thought of while writing it. It has never run
+against a real MDX site.
+
+The failure mode to watch for is prose going **missing**, not extra noise.
+Extra diagnostics are obvious and self-correcting; a mask that overreaches
+silently stops checking sentences and nothing reports it. If a run over an
+MDX-heavy directory comes back suspiciously clean, that is the signal. Both
+MDX issues above are instances of exactly this.
+
+### Rule `ID()` is dead, and disagrees with the tags
+Every rule implements `ID()`, but it is called nowhere in production — only
+by tests that assert `ID() == "some literal"`, which test nothing but
+themselves. The real user-facing vocabulary is `Diagnostic.Rule`, which is
+what gets sorted, printed, and matched by `rules.disable`.
+
+The two have drifted: `markdownURLs.ID()` returns `"url"` while the rule
+emits thirteen different tags, and both prose rules still return
+`"prose-hygiene"` after being split into ten. Either drop `ID()` from the
+interfaces or redefine it as a group name that tags share a prefix with —
+but it should not stay as a third vocabulary nobody reads.
+
+### Unknown names in `rules.disable` are ignored
+A misspelled rule name silently does nothing, so a check you believe is off
+keeps running. This was a deliberate choice — it keeps configs valid across
+renames — but it means "the rule won't turn off" almost always means a
+typo. Validating with a suggestion was built and removed as more machinery
+than the problem warranted; revisit if this bites in practice.
+
+### Table delimiter rows are matched by the `typography` triple-hyphen check.
+
+### Misc. 
+- rules.disable filters output instead of gating the tests themselves
+- MDX fence detection can desynchronize on fence-like lines with trailing text.
+- Namespaced JSX such as <svg:rect> is not masked.
+- joodalint help counts raw MDX syntax as draft words.
+- No installation/fallback documentation for aspell or tidy-html5.
+- Frontmatter schema types and constraints lack a reference.

@@ -35,12 +35,12 @@ func (markdownBalance) Check(f *MarkdownFile, _ *MarkdownContext) []Diagnostic {
 				switch c {
 				case '(', '[', '{':
 					stack = append(stack, openDelim{ch: c, offset: sp.Offset + i})
-			case ')', ']', '}':
-				want := matchOpener(c)
-				if len(stack) == 0 {
-					if c == ')' && (isNumberedListClose(text, i) || isEmoticonClose(text, i)) {
-						continue
-					}
+				case ')', ']', '}':
+					want := matchOpener(c)
+					if len(stack) == 0 {
+						if c == ')' && (isNumberedListClose(text, i) || isEmoticonClose(text, i)) {
+							continue
+						}
 						diags = append(diags, Diagnostic{
 							Path: f.Path, Line: f.LineAt(sp.Offset + i), Rule: "balance",
 							Message: fmt.Sprintf("unmatched closing %q", c),

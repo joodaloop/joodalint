@@ -8,8 +8,8 @@ import (
 
 func TestImageDiagnostics_LargeImage(t *testing.T) {
 	files := []BuiltFile{
-		builtFile("/site/public/images/big.jpg", "/images/big.jpg", 600 * 1024),
-		builtFile("/site/public/images/small.jpg", "/images/small.jpg", 100 * 1024),
+		builtFile("/site/public/images/big.jpg", "/images/big.jpg", 600*1024),
+		builtFile("/site/public/images/small.jpg", "/images/small.jpg", 100*1024),
 	}
 	diags := ImageDiagnostics(files)
 	if len(diags) != 1 {
@@ -22,7 +22,7 @@ func TestImageDiagnostics_LargeImage(t *testing.T) {
 
 func TestImageDiagnostics_PNGWithWebpEstimate(t *testing.T) {
 	files := []BuiltFile{
-		builtFile("/site/public/images/photo.png", "/images/photo.png", 100 * 1024),
+		builtFile("/site/public/images/photo.png", "/images/photo.png", 100*1024),
 	}
 	diags := ImageDiagnostics(files)
 	if len(diags) != 1 {
@@ -39,7 +39,7 @@ func TestImageDiagnostics_PNGWithWebpEstimate(t *testing.T) {
 
 func TestImageDiagnostics_LargePNGGetsBoth(t *testing.T) {
 	files := []BuiltFile{
-		builtFile("/site/public/images/huge.png", "/images/huge.png", 1 << 20),
+		builtFile("/site/public/images/huge.png", "/images/huge.png", 1<<20),
 	}
 	diags := ImageDiagnostics(files)
 	if len(diags) != 2 {
@@ -49,8 +49,8 @@ func TestImageDiagnostics_LargePNGGetsBoth(t *testing.T) {
 
 func TestImageDiagnostics_NonImagesIgnored(t *testing.T) {
 	files := []BuiltFile{
-		builtFile("/site/public/app.js", "/app.js", 5 << 20),
-		builtFile("/site/public/index.html", "/", 5 << 20),
+		builtFile("/site/public/app.js", "/app.js", 5<<20),
+		builtFile("/site/public/index.html", "/", 5<<20),
 	}
 	diags := ImageDiagnostics(files)
 	assertNoDiags(t, diags)
@@ -58,9 +58,9 @@ func TestImageDiagnostics_NonImagesIgnored(t *testing.T) {
 
 func TestImageDiagnostics_ConventionIconsNotFlaggedAsPNG(t *testing.T) {
 	files := []BuiltFile{
-		builtFile("/site/public/apple-touch-icon.png", "/apple-touch-icon.png", 10 * 1024),
-		builtFile("/site/public/favicon.png", "/favicon.png", 10 * 1024),
-		builtFile("/site/public/images/icon.png", "/images/icon.png", 10 * 1024),
+		builtFile("/site/public/apple-touch-icon.png", "/apple-touch-icon.png", 10*1024),
+		builtFile("/site/public/favicon.png", "/favicon.png", 10*1024),
+		builtFile("/site/public/images/icon.png", "/images/icon.png", 10*1024),
 	}
 	diags := ImageDiagnostics(files)
 	if len(diags) != 1 {

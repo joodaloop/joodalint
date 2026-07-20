@@ -17,9 +17,24 @@ type Config struct {
 	IndexSections map[string]map[string]FieldSpec `yaml:"index_pages"`
 	Links         Links                           `yaml:"links"`
 	Spelling      Spelling                        `yaml:"spelling"`
+	Rules         Rules                           `yaml:"rules"`
 
 	mdMatcher    *ignore.GitIgnore
 	buildMatcher *ignore.GitIgnore
+	disabled     map[string]bool
+}
+
+// Rules controls which checks run. Names are the rule tags shown in the
+// left-hand column of lint output, so anything reported can be turned off
+// by copying the tag from the output verbatim.
+type Rules struct {
+	Disable []string `yaml:"disable"`
+}
+
+// IsDisabled reports whether diagnostics tagged rule should be suppressed.
+// The set is built during Load; a zero Config disables nothing.
+func (c *Config) IsDisabled(rule string) bool {
+	return c.disabled[rule]
 }
 
 type Links struct {
@@ -61,16 +76,50 @@ func Load(path string) (*Config, error) {
 	if c.Paths.BuildRoot == "" {
 		c.Paths.BuildRoot = "public"
 	}
+	c.disabled = make(map[string]bool, len(c.Rules.Disable))
+	for _, r := range c.Rules.Disable {
+		if r = strings.TrimSpace(r); r != "" {
+			c.disabled[r] = true
+		}
+	}
 	return &c, nil
 }
 
+// markdownExts are the file extensions treated as markdown content.
+// .mdx is parsed like markdown after its JSX and ESM syntax is masked
+// out; see rules.MaskMDX.
+var markdownExts = []string{".md", ".mdx"}
+
+// IsMarkdownPath reports whether a file path is markdown content.
+func IsMarkdownPath(p string) bool {
+	ext := strings.ToLower(filepath.Ext(p))
+	for _, e := range markdownExts {
+		if ext == e {
+			return true
+		}
+	}
+	return false
+}
+
+// IsMDXPath reports whether a file path needs MDX masking before parsing.
+func IsMDXPath(p string) bool {
+	return strings.EqualFold(filepath.Ext(p), ".mdx")
+}
+
+// IsIndexPage reports whether a path is a section index page, which takes
+// its schema from index_pages rather than sections.
+func IsIndexPage(p string) bool {
+	base := filepath.Base(p)
+	return IsMarkdownPath(base) && strings.TrimSuffix(base, filepath.Ext(base)) == "_index"
+}
+
 // SchemaFor returns the schema to apply to a markdown file given its path.
-// For files named _index.md it consults index_pages; otherwise sections.
+// For section index pages it consults index_pages; otherwise sections.
 // Section match is longest-prefix relative to MarkdownRoot. Files directly
 // under MarkdownRoot use the special section key "root".
 func (c *Config) SchemaFor(filePath string) (string, map[string]FieldSpec) {
 	table := c.Sections
-	if filepath.Base(filePath) == "_index.md" {
+	if IsIndexPage(filePath) {
 		table = c.IndexSections
 	}
 	rel, err := filepath.Rel(c.Paths.MarkdownRoot, filePath)

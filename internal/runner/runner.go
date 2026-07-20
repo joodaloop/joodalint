@@ -31,7 +31,7 @@ func Markdown(cfg *config.Config) (int, error) {
 		if d.IsDir() {
 			return true
 		}
-		return strings.HasSuffix(path, ".md")
+		return config.IsMarkdownPath(path)
 	})
 	if err != nil {
 		return 0, err
@@ -52,6 +52,13 @@ func Markdown(cfg *config.Config) (int, error) {
 		}
 
 		fmRaw, body, fmLines, fmStartLine := rules.SplitFrontmatter(b)
+		// MDX carries JSX and ESM that CommonMark would hand to the prose
+		// rules as if it were text. Mask it before parsing; masking is
+		// length- and newline-preserving, so offsets into Body still
+		// resolve to the right line. Content keeps the original bytes.
+		if config.IsMDXPath(p) {
+			body = rules.MaskMDX(body)
+		}
 		fmParsed, fmParseErr := rules.ParseFrontmatterYAML(fmRaw)
 		ff := &rules.FrontmatterFile{
 			Path:     p,
@@ -85,7 +92,7 @@ func Markdown(cfg *config.Config) (int, error) {
 		return out
 	})
 
-	report(diags, root)
+	n := report(diags, root, cfg)
 
 	if len(paths) < 10 {
 		color := stdoutIsTTY()
@@ -97,7 +104,7 @@ func Markdown(cfg *config.Config) (int, error) {
 		}
 	}
 
-	return len(diags), nil
+	return n, nil
 }
 
 func Build(cfg *config.Config, root string) (int, error) {
@@ -131,8 +138,7 @@ func Build(cfg *config.Config, root string) (int, error) {
 	}
 	diags = append(diags, tidyDiags...)
 
-	report(diags, root)
-	return len(diags), nil
+	return report(diags, root, cfg), nil
 }
 
 // builtSite is everything loadHTML gathers from walking the build root:
@@ -436,7 +442,23 @@ func runFiles[T any](items []T, fn func(T) []rules.Diagnostic) []rules.Diagnosti
 	return all
 }
 
-func report(diags []rules.Diagnostic, root string) {
+// report prints diagnostics and returns how many were actually reported.
+// Callers use that count for the exit status, so it must reflect
+// rules.disable filtering rather than the number of raw findings.
+func report(diags []rules.Diagnostic, root string, cfg *config.Config) int {
+	// Filtering here rather than per-rule means rules.disable applies
+	// uniformly to markdown, frontmatter, and build diagnostics, since
+	// every one of them passes through this function.
+	if cfg != nil && len(cfg.Rules.Disable) > 0 {
+		kept := make([]rules.Diagnostic, 0, len(diags))
+		for _, d := range diags {
+			if !cfg.IsDisabled(d.Rule) {
+				kept = append(kept, d)
+			}
+		}
+		diags = kept
+	}
+
 	prefix := strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
 	for i := range diags {
 		if rel, err := filepath.Rel(root, diags[i].Path); err == nil && !strings.HasPrefix(rel, "..") {
@@ -524,6 +546,7 @@ func report(diags []rules.Diagnostic, root string) {
 	} else {
 		fmt.Println(paint("✓ no issues", green))
 	}
+	return len(diags)
 }
 
 func visibleLen(s string) int { return len(s) }
